@@ -6,25 +6,42 @@ import { supabase } from "@/lib/supabaseClient";
 import type { Item } from "@/lib/types";
 import ClaimForm from "@/components/ClaimForm";
 
+const BUCKET = "item-photos"; 
+
 export default function ItemDetail() {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const [item, setItem] = useState<Item | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
+
     const get = async () => {
       const { data, error } = await supabase
         .from("items")
         .select("*")
         .eq("id", id)
         .single();
+
       if (error) {
         console.error(error.message);
         return;
       }
-      setItem((data as Item) ?? null);
+
+      setItem(data as Item);
+
+      const path = (data as Item)?.photo_url;
+      if (path) {
+        const { data: urlData } = supabase.storage
+          .from(BUCKET)
+          .getPublicUrl(path);
+        setImageUrl(urlData?.publicUrl ?? null);
+      } else {
+        setImageUrl(null);
+      }
     };
+
     get();
   }, [id]);
 
@@ -33,10 +50,18 @@ export default function ItemDetail() {
   return (
     <div className="grid md:grid-cols-2 gap-6">
       <div>
-        {item.photo_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.photo_url} alt={item.title} className="rounded-xl" />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={item.title}
+            className="rounded-xl w-full h-auto object-cover"
+          />
+        ) : (
+          <div className="rounded-xl h-64 bg-neutral-800 flex items-center justify-center text-neutral-400">
+            No image
+          </div>
         )}
+
         <h1 className="text-2xl font-bold mt-3">{item.title}</h1>
         <p className="mt-2 text-gray-700 whitespace-pre-wrap">
           {item.description}

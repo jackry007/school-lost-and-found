@@ -1,38 +1,77 @@
+// src/app/page.tsx
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ItemCard } from "@/components/ItemCard";
+import { supabase } from "@/lib/supabaseClient";
 
-const mockItems = [
-  {
-    id: "1",
-    title: "Black North Face Jacket",
-    location: "Gym Locker Room",
-    category: "Clothing",
-    date: "2025-10-08",
-    thumb:
-      "https://images.unsplash.com/photo-1520975922203-b4f7e981e8f9?q=80&w=800&auto=format&fit=crop",
-  },
-  {
-    id: "2",
-    title: "Blue Hydro Flask",
-    location: "Library 2F",
-    category: "Bottle",
-    date: "2025-10-07",
-    thumb:
-      "https://images.unsplash.com/photo-1561154464-82e9adf32764?q=80&w=800&auto=format&fit=crop",
-  },
-  {
-    id: "3",
-    title: "TI-84 Plus Calculator",
-    location: "Room 214",
-    category: "Electronics",
-    date: "2025-10-06",
-    thumb:
-      "https://images.unsplash.com/photo-1596495578065-3e6ecf5b9a3b?q=80&w=800&auto=format&fit=crop",
-  },
-];
+type CardItem = {
+  id: string;
+  title: string;
+  location: string;
+  category: string;
+  date: string;
+  thumb: string;
+};
+
+const BUCKET = "item-photos";
+const FALLBACK_THUMB = "/no-image.png";
 
 export default function HomePage() {
-  const hasItems = mockItems.length > 0;
+  const [items, setItems] = useState<CardItem[]>([]);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      // IMPORTANT: add .schema('public') and remove the status filter for now
+      const { data, error } = await supabase
+        .schema("public")
+        .from("items")
+        .select(
+          "id, title, location_found, category, date_found, photo_url, status"
+        )
+        // .eq("status", "listed") // add back after verifying data comes through
+        .order("id", { ascending: false })
+        .limit(12);
+
+      console.log("Supabase items fetch →", { error, data });
+      if (error) {
+        setErrMsg(error.message);
+        return;
+      }
+
+      const mapped: CardItem[] = (data ?? []).map((row: any) => {
+        // Build a public URL from Storage
+        let thumb = FALLBACK_THUMB;
+        const path: string | null = row.photo_url ?? null;
+        if (path) {
+          if (/^https?:\/\//i.test(path)) {
+            thumb = path;
+          } else {
+            const { data: urlData } = supabase.storage
+              .from(BUCKET)
+              .getPublicUrl(path);
+            thumb = urlData?.publicUrl || FALLBACK_THUMB;
+          }
+        }
+
+        return {
+          id: String(row.id),
+          title: String(row.title ?? "Untitled"),
+          location: String(row.location_found ?? "—"),
+          category: String(row.category ?? "Misc"),
+          date: new Date(row.date_found).toISOString().slice(0, 10),
+          thumb,
+        };
+      });
+
+      setItems(mapped);
+      setErrMsg(null);
+    })();
+  }, []);
+
+  const hasItems = items.length > 0;
 
   return (
     <>
@@ -70,6 +109,12 @@ export default function HomePage() {
         </div>
       </section>
 
+      {errMsg && (
+        <div className="mb-4 rounded-lg border border-red-600/40 bg-red-900/10 p-3 text-sm text-red-400">
+          Supabase error: {errMsg}
+        </div>
+      )}
+
       {/* Items grid / empty state */}
       {hasItems ? (
         <section>
@@ -81,7 +126,7 @@ export default function HomePage() {
           </div>
 
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {mockItems.map((it) => (
+            {items.map((it) => (
               <li key={it.id}>
                 <ItemCard item={it} />
               </li>
