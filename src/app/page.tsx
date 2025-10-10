@@ -31,8 +31,9 @@ export default function HomePage() {
         .select(
           "id, title, location_found, category, date_found, photo_url, status"
         )
-        // .eq("status", "listed") // add back after verifying data comes through
-        .order("id", { ascending: false })
+        // .eq("status", "listed")
+        .order("date_found", { ascending: false, nullsFirst: false }) // ✅ newest first
+        .order("id", { ascending: false }) // tiebreaker for identical dates
         .limit(12);
 
       console.log("Supabase items fetch →", { error, data });
