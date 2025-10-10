@@ -4,14 +4,21 @@
 
 /* ===== Theme tokens ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Cherry Creek color scheme */
+  --background: #f8fafc; /* very light gray/white background */
+  --foreground: #111827; /* dark navy text */
+  --accent-blue: #0c3c8c; /* Cherry Creek navy blue */
+  --accent-red: #b3202e; /* Cherry Creek cherry red */
+  --card-bg: #ffffff;
+  --border-color: #e5e7eb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground: #f3f4f6;
+    --card-bg: #1f2937;
+    --border-color: #374151;
   }
 }
 

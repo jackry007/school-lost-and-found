@@ -14,11 +14,11 @@ export function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-gray-200/70 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-800/70 dark:bg-gray-950/70">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-20 border-b border-[var(--accent-red)] bg-[var(--accent-blue)] text-white shadow-md">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Brand + Nav */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="font-semibold tracking-tight text-lg">
+          <Link href="/" className="text-lg font-semibold tracking-tight">
             🎒 Lost & Found
           </Link>
           <nav className="hidden md:flex items-center gap-4 text-sm">
@@ -28,10 +28,10 @@ export function Header() {
                 <Link
                   key={n.href}
                   href={n.href}
-                  className={`rounded-xl px-3 py-1 transition ${
+                  className={`rounded-xl px-3 py-1 transition font-medium ${
                     active
-                      ? "bg-gray-900 text-white dark:bg-white dark:text-gray-950"
-                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                      ? "bg-[var(--accent-red)] text-white"
+                      : "text-white/90 hover:bg-white/15 hover:text-white"
                   }`}
                 >
                   {n.label}
@@ -41,18 +41,21 @@ export function Header() {
           </nav>
         </div>
 
-        {/* Right: Auth + Search shortcut */}
+        {/* Right: Auth + Search */}
         <div className="flex items-center gap-2">
           <Link
             href="/search"
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20"
             aria-label="Search items"
             title="Search items"
           >
             <Search size={16} />
             <span className="hidden sm:inline">Search</span>
           </Link>
-          <Link href="/signin" className="btn">
+          <Link
+            href="/signin"
+            className="rounded-xl bg-[var(--accent-red)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#a91b28]"
+          >
             Sign in
           </Link>
         </div>
