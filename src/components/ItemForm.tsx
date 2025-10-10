@@ -7,15 +7,26 @@ import { supabase } from "@/lib/supabaseClient";
 
 const BUCKET = "item-photos";
 
-// Optional: adjust to your categories
-const CATEGORIES = [
+// Keep this in sync with your DB enum / filter sidebar
+export const CATEGORIES = [
   "Clothing",
   "Electronics",
-  "Bottle",
+  "Accessories",
+  "Bags",
   "Books",
   "Keys",
-  "Backpack",
-  "Other",
+  "IDs / Cards",
+  "Misc",
+] as const;
+export type Category = (typeof CATEGORIES)[number];
+
+const MAX_MB = 5; // allow up to 5MB (adjust as you like)
+const ALLOWED_MIME = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
 ];
 
 export default function ItemForm() {
@@ -34,11 +45,13 @@ export default function ItemForm() {
 
     const title = String(formData.get("title") || "").trim();
     const location_found = String(formData.get("location_found") || "").trim();
-    const category = String(formData.get("category") || "Other");
+    const category = (String(formData.get("category") || "Misc").trim() ||
+      "Misc") as Category;
     const date_found = String(formData.get("date_found") || "").trim();
     const notes = String(formData.get("notes") || "").trim();
     const file = formData.get("photo") as File | null;
 
+    // Basic validations
     if (!title) {
       setErr("Please enter a title.");
       setSubmitting(false);
@@ -50,12 +63,32 @@ export default function ItemForm() {
       return;
     }
 
+    // Optional: file checks
+    if (file && file.size > 0) {
+      const fileMb = file.size / (1024 * 1024);
+      if (fileMb > MAX_MB) {
+        setErr(
+          `Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`
+        );
+        setSubmitting(false);
+        return;
+      }
+      if (
+        ALLOWED_MIME.length &&
+        file.type &&
+        !ALLOWED_MIME.includes(file.type)
+      ) {
+        setErr("Unsupported image type. Please upload JPG/PNG/WebP/HEIC.");
+        setSubmitting(false);
+        return;
+      }
+    }
+
     // 1) Upload photo (if provided)
     let photo_path: string | null = null;
     if (file && file.size > 0) {
       try {
-        const ext = file.name.split(".").pop() || "jpg";
-        // If you have auth, you could use the user's id in the path. Using "public" prefix for anon-friendly policy.
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
         const path = `public/${Date.now()}-${Math.random()
           .toString(36)
           .slice(2)}.${ext}`;
@@ -69,7 +102,7 @@ export default function ItemForm() {
           });
 
         if (uploadErr) throw uploadErr;
-        photo_path = path; // store the *path* (your homepage code already handles path→publicURL)
+        photo_path = path; // store the storage path (homepage resolves to public URL)
       } catch (e: any) {
         setErr(`Photo upload failed: ${e?.message || e}`);
         setSubmitting(false);
@@ -84,9 +117,9 @@ export default function ItemForm() {
           title,
           location_found,
           category,
-          date_found, // should be date or timestamp column in Supabase
-          status: "listed", // or "pending" if you want admin approval first
-          photo_url: photo_path, // store the storage path (homepage code resolves it)
+          date_found, // date or timestamp column in Supabase
+          status: "listed", // or "pending" if you require moderation
+          photo_url: photo_path, // keep the path; you already resolve it elsewhere
           notes,
         },
       ]);
@@ -98,7 +131,7 @@ export default function ItemForm() {
       return;
     }
 
-    // 3) Redirect (and optionally show a toast on home via a query param)
+    // 3) Redirect (optionally show toast on home via ?posted=1)
     router.push("/?posted=1");
   }
 
@@ -123,7 +156,7 @@ export default function ItemForm() {
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Category</span>
-          <select name="category" className="input w-full">
+          <select name="category" defaultValue="Misc" className="input w-full">
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -184,7 +217,7 @@ export default function ItemForm() {
             }}
           />
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            JPG/PNG, ideally under 2MB.
+            JPG/PNG/WebP/HEIC, up to {MAX_MB}MB.
           </p>
         </label>
 

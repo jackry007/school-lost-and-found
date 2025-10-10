@@ -18,32 +18,41 @@ type CardItem = {
 const BUCKET = "item-photos";
 const FALLBACK_THUMB = "/no-image.png";
 
+// 👉 Edit these to match your categories / DB enum
+const CATEGORY_OPTIONS = [
+  "All",
+  "Clothing",
+  "Electronics",
+  "Accessories",
+  "Bags",
+  "Books",
+  "Keys",
+  "IDs / Cards",
+  "Misc",
+];
+
 export default function HomePage() {
   const [items, setItems] = useState<CardItem[]>([]);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      // IMPORTANT: add .schema('public') and remove the status filter for now
       const { data, error } = await supabase
         .schema("public")
         .from("items")
         .select(
           "id, title, location_found, category, date_found, photo_url, status"
         )
-        // .eq("status", "listed")
-        .order("date_found", { ascending: false, nullsFirst: false }) // ✅ newest first
-        .order("id", { ascending: false }) // tiebreaker for identical dates
+        .order("date_found", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false })
         .limit(12);
 
-      console.log("Supabase items fetch →", { error, data });
       if (error) {
         setErrMsg(error.message);
         return;
       }
 
       const mapped: CardItem[] = (data ?? []).map((row: any) => {
-        // Build a public URL from Storage
         let thumb = FALLBACK_THUMB;
         const path: string | null = row.photo_url ?? null;
         if (path) {
@@ -96,16 +105,51 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-          <form action="/search" className="w-full md:w-[420px]">
-            <label htmlFor="q" className="sr-only">
-              Search items
-            </label>
-            <input
-              id="q"
-              name="q"
-              placeholder="Search by name, color, location..."
-              className="input"
-            />
+
+          {/* 🔽 Search + Category filter */}
+          <form action="/search" className="w-full md:w-[520px]">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {/* Category dropdown */}
+              <div className="sm:w-48">
+                <label htmlFor="category" className="sr-only">
+                  Category
+                </label>
+                <select
+                  id="category"
+                  name="category"
+                  defaultValue=""
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700"
+                >
+                  {/* empty value = All */}
+                  {CATEGORY_OPTIONS.map((c) => (
+                    <option key={c} value={c === "All" ? "" : c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Keyword input */}
+              <div className="flex-1">
+                <label htmlFor="q" className="sr-only">
+                  Search items
+                </label>
+                <input
+                  id="q"
+                  name="q"
+                  placeholder="Search by name, color, location..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700"
+                />
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
+              >
+                Search
+              </button>
+            </div>
           </form>
         </div>
       </section>
@@ -116,7 +160,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Items grid / empty state */}
       {hasItems ? (
         <section>
           <div className="mb-4 flex items-center justify-between">
@@ -125,7 +168,6 @@ export default function HomePage() {
               View all
             </Link>
           </div>
-
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((it) => (
               <li key={it.id}>
