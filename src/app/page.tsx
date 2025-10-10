@@ -1,58 +1,107 @@
-// src/app/page.tsx  (Home: search & list)
-"use client";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import ItemCard from "@/components/ItemCard";
-import type { Item } from "@/lib/types";
+import Link from "next/link";
+import { ItemCard } from "@/components/ItemCard";
+
+const mockItems = [
+  {
+    id: "1",
+    title: "Black North Face Jacket",
+    location: "Gym Locker Room",
+    category: "Clothing",
+    date: "2025-10-08",
+    thumb:
+      "https://images.unsplash.com/photo-1520975922203-b4f7e981e8f9?q=80&w=800&auto=format&fit=crop",
+  },
+  {
+    id: "2",
+    title: "Blue Hydro Flask",
+    location: "Library 2F",
+    category: "Bottle",
+    date: "2025-10-07",
+    thumb:
+      "https://images.unsplash.com/photo-1561154464-82e9adf32764?q=80&w=800&auto=format&fit=crop",
+  },
+  {
+    id: "3",
+    title: "TI-84 Plus Calculator",
+    location: "Room 214",
+    category: "Electronics",
+    date: "2025-10-06",
+    thumb:
+      "https://images.unsplash.com/photo-1596495578065-3e6ecf5b9a3b?q=80&w=800&auto=format&fit=crop",
+  },
+];
 
 export default function HomePage() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [q, setQ] = useState("");
-
-  const fetchItems = async () => {
-    let query = supabase
-      .from("items")
-      .select("*")
-      .eq("status", "listed")
-      .order("created_at", { ascending: false });
-
-    if (q.trim()) {
-      // simple title/description search
-      query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      console.error(error.message);
-      return;
-    }
-    setItems((data as Item[]) ?? []);
-  };
-
-  useEffect(() => {
-    fetchItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const hasItems = mockItems.length > 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search items"
-          className="flex-1 border rounded-xl p-2"
-        />
-        <button onClick={fetchItems} className="border rounded-xl px-3">
-          Search
-        </button>
-      </div>
+    <>
+      {/* Hero + search */}
+      <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Find your stuff fast
+            </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Search recent found items or submit a quick report when you find
+              something.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Link href="/report" className="btn">
+                Report Found Item
+              </Link>
+              <Link href="/search" className="btn btn-outline">
+                Browse Items
+              </Link>
+            </div>
+          </div>
+          <form action="/search" className="w-full md:w-[420px]">
+            <label htmlFor="q" className="sr-only">
+              Search items
+            </label>
+            <input
+              id="q"
+              name="q"
+              placeholder="Search by name, color, location..."
+              className="input"
+            />
+          </form>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items.map((it) => (
-          <ItemCard key={it.id} item={it} />
-        ))}
-      </div>
-    </div>
+      {/* Items grid / empty state */}
+      {hasItems ? (
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-medium">Recently reported</h2>
+            <Link href="/search" className="text-sm underline">
+              View all
+            </Link>
+          </div>
+
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {mockItems.map((it) => (
+              <li key={it.id}>
+                <ItemCard item={it} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <section className="grid place-items-center rounded-2xl border border-dashed border-gray-300 py-20 dark:border-gray-700">
+          <div className="text-center">
+            <p className="text-lg font-medium">No items yet</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Be the first to add a found item so we can get it back to its
+              owner.
+            </p>
+            <Link href="/report" className="btn mt-4">
+              Report an Item
+            </Link>
+          </div>
+        </section>
+      )}
+    </>
   );
 }

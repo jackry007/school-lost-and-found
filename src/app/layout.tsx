@@ -1,6 +1,11 @@
-// src/app/layout.tsx
 import "./globals.css";
-import Nav from "@/components/Nav";
+import type { Metadata } from "next";
+import { Header } from "@/components/Header";
+
+export const metadata: Metadata = {
+  title: "School Lost & Found",
+  description: "Report and find lost items easily.",
+};
 
 export default function RootLayout({
   children,
@@ -9,9 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-white text-gray-900">
-        <Nav />
-        <main className="p-6 max-w-5xl mx-auto">{children}</main>
+      <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
+        <Header />
+        <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </main>
       </body>
     </html>
   );
