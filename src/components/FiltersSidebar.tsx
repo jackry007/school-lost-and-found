@@ -12,6 +12,7 @@ const CATEGORY_OPTIONS = [
   "Books",
   "Keys",
   "IDs / Cards",
+  "Bottle",
   "Misc",
 ];
 

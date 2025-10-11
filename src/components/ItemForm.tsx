@@ -16,6 +16,7 @@ export const CATEGORIES = [
   "Books",
   "Keys",
   "IDs / Cards",
+  "Bottle",
   "Misc",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];

@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Header } from "@/components/Header";
+import SchoolHeaderLogo from "@/components/SchoolHeaderLogo";
 
 export const metadata: Metadata = {
   title: "School Lost & Found",
@@ -15,7 +16,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
+        {/* White Cherry Creek logo band */}
+        <SchoolHeaderLogo />
+
+        {/* Red Lost & Found header with nav + disclaimer */}
         <Header />
+
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           {children}
         </main>
