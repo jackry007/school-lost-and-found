@@ -1,12 +1,15 @@
+// src/components/SchoolHeaderLogo.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
+// from src/components -> .. (src) -> .. (project root) -> public/images/...
+import logo from "../../public/images/cherry-creek-logo.png";
 
 export default function SchoolHeaderLogo() {
   return (
     <div className="border-b border-gray-200 bg-white">
-      <div className="flex w-full items-center justify-between pl-0 pr-8 lg:pr-12 py-6 ml-6">
+      <div className="flex w-full items-center justify-between pl-0 pr-8 lg:pr-12 py-6">
         {/* Left: Logo + Text */}
         <Link
           href="/"
@@ -14,10 +17,8 @@ export default function SchoolHeaderLogo() {
           aria-label="Cherry Creek High School Home"
         >
           <Image
-            src="/images/cherry-creek-logo.png"
+            src={logo}
             alt="Cherry Creek High School logo"
-            width={120}
-            height={120}
             className="h-28 w-auto"
             priority
           />
