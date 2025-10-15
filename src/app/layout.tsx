@@ -35,9 +35,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       {/* lang="en" helps accessibility and screen readers */}
-      <body className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased">
+      <body
+        suppressHydrationWarning
+        className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased"
+      >
         {/* White Cherry Creek logo band (top of every page) */}
         <SchoolHeaderLogo />
 
@@ -45,9 +48,7 @@ export default function RootLayout({
         <Header />
 
         {/* Page content area */}
-        <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
+        <main className="py-8">{children}</main>
 
         {/* Potential Footer Area */}
       </body>
