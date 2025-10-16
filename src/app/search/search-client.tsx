@@ -11,11 +11,10 @@ import {
   FiltersSidebar,
   type FiltersInitial,
 } from "@/components/FiltersSidebar";
+import { uniqueLabels, normalize } from "@/utils/unique";
 
 const BUCKET = "item-photos";
-const FALLBACK = `${BASE}/no-image.png`; // <— changed
-
-
+const FALLBACK = `${BASE}/no-image.png`; // use this consistently
 
 /* ---------- Brand tokens (match home) ---------- */
 const CREEK_RED = "#BF1E2E";
@@ -119,19 +118,27 @@ export default function SearchClient() {
   const sort: "newest" | "oldest" =
     sp.get("sort") === "oldest" ? "oldest" : "newest";
 
-  const categories = useMemo(() => {
+  // Raw categories from URL (support both multiple ?category= and comma list)
+  const categoriesRaw = useMemo(() => {
     const all = sp.getAll("category").filter(Boolean);
     if (all.length === 0) {
       const single = sp.get("category");
-      if (single?.includes(","))
+      if (single?.includes(",")) {
         return single
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean);
+      }
       if (single) return [single];
     }
     return all;
   }, [sp]);
+
+  // ✅ De-dupe categories across the app (prevents duplicate key "Bottle")
+  const categories = useMemo(
+    () => uniqueLabels(categoriesRaw),
+    [categoriesRaw]
+  );
 
   const [items, setItems] = useState<
     {
@@ -182,9 +189,6 @@ export default function SearchClient() {
         return;
       }
 
-      const BUCKET = "item-photos";
-      const FALLBACK = "/no-image.png";
-
       const mapped =
         (data ?? []).map((row: Row) => {
           let thumb = FALLBACK;
@@ -224,12 +228,13 @@ export default function SearchClient() {
 
   const initialFilters: FiltersInitial = {
     q,
-    category: categories,
+    category: categories, // pass cleaned categories to sidebar
     location,
     date_from,
     date_to,
     sort,
   };
+
   const hasActive =
     q ||
     categories.length > 0 ||
@@ -242,7 +247,6 @@ export default function SearchClient() {
     <div
       className="min-h-screen"
       style={{
-        // subtle page shell like home
         background:
           "linear-gradient(180deg, #0B2C5C0A 0%, #0B2C5C08 40%, #ffffff 100%)",
         backgroundImage:
@@ -272,7 +276,7 @@ export default function SearchClient() {
                   <div className="flex flex-wrap items-center gap-2">
                     {q && <Pill>q: “{q}”</Pill>}
                     {categories.map((c) => (
-                      <Pill key={c}>{c}</Pill>
+                      <Pill key={`pill-${normalize(c)}`}>{c}</Pill>
                     ))}
                     {location && <Pill>{location}</Pill>}
                     {(date_from || date_to) && (

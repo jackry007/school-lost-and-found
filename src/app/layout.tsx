@@ -2,33 +2,18 @@
 // ------------------------------------------------------
 // 🏫 Root Layout for the School Lost & Found website
 // ------------------------------------------------------
-// This file defines the global structure, design, and metadata
-// that wrap around every page (Home, Report, Search, Admin, etc).
-//
-//
-// Every page automatically appears inside this layout’s <main> area.
-// ------------------------------------------------------
-
-import "./globals.css"; // Global styles (Tailwind + theme variables)
+import "./globals.css";
 import type { Metadata } from "next";
-import { Header } from "@/components/Header"; // Red Lost & Found header bar (navigation)
-import SchoolHeaderLogo from "@/components/SchoolHeaderLogo"; // White band with school logo
+import { Header } from "@/components/Header";
+import SchoolHeaderLogo from "@/components/SchoolHeaderLogo";
+import MainShell from "@/components/MainShell";
 
-// ------------------------------------------------------
-// 🔖 Metadata for SEO, browser tabs, and competition clarity
-// ------------------------------------------------------
-// Appears as the browser tab title and description in search engines.
-
+// 🔖 Metadata
 export const metadata: Metadata = {
   title: "School Lost & Found",
   description: "Report and find lost items easily.",
 };
 
-// ------------------------------------------------------
-// 🧩 RootLayout Component
-// ------------------------------------------------------
-// "children" = the current page (e.g. Home, Report, etc.)
-// Next.js automatically injects the active page into {children}.
 export default function RootLayout({
   children,
 }: {
@@ -36,7 +21,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* lang="en" helps accessibility and screen readers */}
       <body
         suppressHydrationWarning
         className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased"
@@ -47,8 +31,8 @@ export default function RootLayout({
         {/* Red Lost & Found header with navigation links */}
         <Header />
 
-        {/* Page content area */}
-        <main className="py-8">{children}</main>
+        {/* Page content area (hydration-safe wrapper adds any dynamic classes after mount) */}
+        <MainShell>{children}</MainShell>
 
         {/* Potential Footer Area */}
       </body>

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+
+    "build:gh": "cross-env GH_PAGES=true next build",
+    "deploy": "npm run build:gh && mkdir -p out && echo > out/.nojekyll && gh-pages -d out -b gh-pages"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
