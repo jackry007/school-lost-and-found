@@ -1,6 +1,7 @@
 // app/search/search-client.tsx
 "use client";
 
+import { BASE } from "@/lib/basePath";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +11,11 @@ import {
   FiltersSidebar,
   type FiltersInitial,
 } from "@/components/FiltersSidebar";
+
+const BUCKET = "item-photos";
+const FALLBACK = `${BASE}/no-image.png`; // <— changed
+
+
 
 /* ---------- Brand tokens (match home) ---------- */
 const CREEK_RED = "#BF1E2E";

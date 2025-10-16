@@ -4,6 +4,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { BASE } from "@/lib/basePath";
+
 /* ----- Brand tokens (match home) ----- */
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
@@ -166,7 +168,7 @@ export function FiltersSidebar({ initial }: Props) {
         {/* Form */}
         <form
           ref={formRef}
-          action="/search"
+          action={BASE ? `${BASE}/search` : "/search"} // <— changed
           method="get"
           className="space-y-5"
           onChange={onChange}

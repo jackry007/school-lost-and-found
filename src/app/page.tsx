@@ -6,7 +6,7 @@
 // ------------------------------------------------------
 
 "use client";
-
+import { BASE } from "@/lib/basePath";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
@@ -25,7 +25,7 @@ type CardItem = {
 };
 
 const BUCKET = "item-photos";
-const FALLBACK_THUMB = "/no-image.png";
+const FALLBACK_THUMB = `${BASE}/no-image.png`; // <— changed
 
 /* ---------- Brand tokens ---------- */
 const CREEK_RED = "#BF1E2E";
@@ -107,7 +107,7 @@ export default function HomePage() {
       {/* 🌄 HERO */}
       <section className="relative min-h-[68vh] md:h-[520px] w-full overflow-hidden">
         <img
-          src="/images/backpack-bench.jpg"
+          src={`${BASE}/images/backpack-bench.jpg`}
           alt="A backpack left on a school bench"
           className="absolute inset-0 h-full w-full object-cover"
         />
@@ -396,7 +396,7 @@ function MissionSection() {
               style={{ borderColor: "#E5E7EB" }}
             >
               <motion.img
-                src="/images/LostBackpack.png"
+                src={`${BASE}/images/LostBackpack.png`}
                 alt="Students reuniting with a backpack at the office"
                 className="h-72 w-full rounded-xl object-cover"
                 whileHover={{ scale: 1.03 }}
