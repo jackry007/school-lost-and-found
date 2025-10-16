@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { ItemCard } from "@/components/ItemCard";
 import {
@@ -10,6 +11,11 @@ import {
   type FiltersInitial,
 } from "@/components/FiltersSidebar";
 
+/* ---------- Brand tokens (match home) ---------- */
+const CREEK_RED = "#BF1E2E";
+const CREEK_NAVY = "#0B2C5C";
+
+/* ---------- Types ---------- */
 type Row = {
   id: string | number;
   title: string | null;
@@ -20,6 +26,83 @@ type Row = {
   status: string | null;
 };
 
+/* ---------- Small UI bits to mirror home ---------- */
+function SectionHeader({ title, kicker }: { title: string; kicker?: string }) {
+  return (
+    <div className="mb-5">
+      {kicker && (
+        <div
+          className="inline-block rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-white"
+          style={{ backgroundColor: CREEK_NAVY }}
+        >
+          {kicker}
+        </div>
+      )}
+      <div className="mt-2 flex items-center gap-3">
+        <svg
+          width="28"
+          height="32"
+          viewBox="0 0 24 28"
+          aria-hidden
+          className="drop-shadow-sm"
+        >
+          <path
+            d="M12 0l10 4v8c0 7-5 12-10 16C7 24 2 19 2 12V4l10-4z"
+            fill={CREEK_RED}
+          />
+          <path
+            d="M12 3l7 2v6c0 5-4 9-7 12-3-3-7-7-7-12V5l7-2z"
+            fill="white"
+            opacity=".95"
+          />
+          <path
+            d="M12 4.5l5 1.5v5c0 4-3.2 7-5 8.8-1.8-1.8-5-4.8-5-8.8v-5l5-1.5z"
+            fill={CREEK_NAVY}
+          />
+        </svg>
+        <h2
+          className="text-2xl sm:text-3xl font-extrabold tracking-tight"
+          style={{ color: CREEK_NAVY }}
+        >
+          {title}
+        </h2>
+      </div>
+      <div
+        className="mt-2 h-1 rounded-full"
+        style={{
+          background: `linear-gradient(90deg, ${CREEK_RED}, ${CREEK_NAVY})`,
+        }}
+      />
+    </div>
+  );
+}
+
+function PaperGrid({ children }: { children: React.ReactNode }) {
+  const dot = encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
+  );
+  return (
+    <div
+      className="rounded-3xl p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,.05)]"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,${dot}")`,
+        backgroundColor: "#fafbff",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-white px-3 py-1 text-sm shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800">
+      {children}
+    </span>
+  );
+}
+
+/* ---------- Component ---------- */
 export default function SearchClient() {
   const sp = useSearchParams();
 
@@ -150,65 +233,103 @@ export default function SearchClient() {
     sort === "oldest";
 
   return (
-    <section className="grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-6">
-      <FiltersSidebar initial={initialFilters} />
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h1 className="text-2xl font-semibold">Browse Items</h1>
-          {hasActive && (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              {q && (
-                <span className="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">
-                  q: “{q}”
-                </span>
-              )}
-              {categories.map((c) => (
-                <span
-                  key={c}
-                  className="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800"
+    <div
+      className="min-h-screen"
+      style={{
+        // subtle page shell like home
+        background:
+          "linear-gradient(180deg, #0B2C5C0A 0%, #0B2C5C08 40%, #ffffff 100%)",
+        backgroundImage:
+          "radial-gradient(rgba(11,44,92,0.06) 1px, transparent 1px)",
+        backgroundSize: "18px 18px",
+      }}
+    >
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+        <SectionHeader title="Browse Items" kicker="Search" />
+
+        {/* Two-column layout like home sections */}
+        <div className="grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-6">
+          <FiltersSidebar initial={initialFilters} />
+
+          {/* Right column content in a PaperGrid for consistency */}
+          <PaperGrid>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h1
+                  className="text-xl font-semibold"
+                  style={{ color: CREEK_NAVY }}
                 >
-                  {c}
-                </span>
-              ))}
-              {location && (
-                <span className="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">
-                  {location}
-                </span>
+                  Results
+                </h1>
+
+                {hasActive && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {q && <Pill>q: “{q}”</Pill>}
+                    {categories.map((c) => (
+                      <Pill key={c}>{c}</Pill>
+                    ))}
+                    {location && <Pill>{location}</Pill>}
+                    {(date_from || date_to) && (
+                      <Pill>
+                        {date_from || "…"} → {date_to || "…"}
+                      </Pill>
+                    )}
+                    <Link
+                      href="/search"
+                      className="text-sm underline"
+                      style={{ color: CREEK_RED }}
+                    >
+                      Clear
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-sm text-gray-600">
+                {loading
+                  ? "Searching…"
+                  : `${items.length} item${
+                      items.length === 1 ? "" : "s"
+                    } found`}
+              </div>
+
+              {err && (
+                <div className="rounded-lg border border-red-500/30 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/20 dark:text-red-200">
+                  Error: {err}
+                </div>
               )}
-              {(date_from || date_to) && (
-                <span className="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">
-                  {date_from || "…"} → {date_to || "…"}
-                </span>
+
+              {!loading && !err && items.length === 0 ? (
+                <div className="grid place-items-center rounded-2xl border border-dashed border-gray-300 py-16 text-center">
+                  <div>
+                    <p className="text-lg font-medium">
+                      No items match your filters.
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Try adjusting your keywords or categories.
+                    </p>
+                    <Link
+                      href="/search"
+                      className="mt-4 inline-block rounded-lg px-4 py-2 text-white"
+                      style={{ backgroundColor: CREEK_RED }}
+                    >
+                      Clear filters
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {items.map((it) => (
+                    <li key={it.id}>
+                      <ItemCard item={it as any} />
+                    </li>
+                  ))}
+                </ul>
               )}
-              <a href="/search" className="underline">
-                Clear
-              </a>
             </div>
-          )}
+          </PaperGrid>
         </div>
-
-        <div className="text-sm text-gray-500">
-          {loading
-            ? "Searching…"
-            : `${items.length} item${items.length === 1 ? "" : "s"} found`}
-        </div>
-
-        {err && <div className="p-4 text-red-500">Error: {err}</div>}
-
-        {!loading && !err && items.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
-            No items match your filters.
-          </div>
-        ) : (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((it) => (
-              <li key={it.id}>
-                <ItemCard item={it as any} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
