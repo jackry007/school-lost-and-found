@@ -13,6 +13,7 @@ import "./globals.css"; // Global styles (Tailwind + theme variables)
 import type { Metadata } from "next";
 import { Header } from "@/components/Header"; // Red Lost & Found header bar (navigation)
 import SchoolHeaderLogo from "@/components/SchoolHeaderLogo"; // White band with school logo
+import Footer from "@/components/Footer";
 
 // ------------------------------------------------------
 // 🔖 Metadata for SEO, browser tabs, and competition clarity
@@ -50,7 +51,8 @@ export default function RootLayout({
         {/* Page content area */}
         <main className="py-8">{children}</main>
 
-        {/* Potential Footer Area */}
+        <Footer />
+        
       </body>
     </html>
   );
