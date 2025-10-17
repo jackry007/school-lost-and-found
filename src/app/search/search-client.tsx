@@ -24,7 +24,7 @@ const CREEK_NAVY = "#0B2C5C";
 type Row = {
   id: string | number;
   title: string | null;
-  location_found: string | null;
+  location: string | null;
   category: string | null;
   date_found: string | null;
   photo_url: string | null;
@@ -162,16 +162,16 @@ export default function SearchClient() {
       let query = supabase
         .schema("public")
         .from("items")
-        .select("id,title,location_found,category,date_found,photo_url,status")
+        .select("id,title,location,category,date_found,photo_url,status")
         .eq("status", "listed");
 
       if (q) {
         query = query.or(
-          `title.ilike.%${q}%,location_found.ilike.%${q}%,category.ilike.%${q}%`
+          `title.ilike.%${q}%,location.ilike.%${q}%,category.ilike.%${q}%`
         );
       }
       if (categories.length) query = query.in("category", categories);
-      if (location) query = query.ilike("location_found", `%${location}%`);
+      if (location) query = query.ilike("location", `%${location}%`);
       if (date_from) query = query.gte("date_found", date_from);
       if (date_to) query = query.lte("date_found", date_to);
 
@@ -208,7 +208,7 @@ export default function SearchClient() {
           return {
             id: String(row.id),
             title: String(row.title ?? "Untitled"),
-            location: String(row.location_found ?? "—"),
+            location: String(row.location ?? "—"),
             category: String(row.category ?? "Misc"),
             date: row.date_found
               ? new Date(row.date_found).toISOString().slice(0, 10)

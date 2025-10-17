@@ -63,7 +63,7 @@ export default function HomePage() {
         .schema("public")
         .from("items")
         .select(
-          "id, title, location_found, category, date_found, photo_url, status"
+          "id, title, location, category, date_found, photo_url, status"
         )
         .order("date_found", { ascending: false })
         .limit(8); // (#8) denser "Recently Reported"
@@ -89,7 +89,7 @@ export default function HomePage() {
         return {
           id: String(row.id),
           title: String(row.title ?? "Untitled"),
-          location: String(row.location_found ?? "—"),
+          location: String(row.location ?? "—"),
           category: String(row.category ?? "Misc"),
           date: new Date(row.date_found).toISOString().slice(0, 10),
           thumb,
