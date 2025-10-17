@@ -1,6 +1,7 @@
 // src/components/FiltersSidebar.tsx
 "use client";
 
+import { uniqueLabels, normalize } from "@/utils/unique";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 
@@ -38,65 +39,70 @@ export function FiltersSidebar({ initial }: Props) {
   const sp = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Ensure category state starts de-duped
   const [cats, setCats] = useState<string[]>(
-    (initial.category ?? []).filter(Boolean)
+    uniqueLabels((initial.category ?? []).filter(Boolean))
   );
+
+  const catsUnique = useMemo(() => uniqueLabels(cats), [cats]);
 
   const isActive = useMemo(() => {
     return (
       (initial.q && initial.q.length > 0) ||
-      cats.length > 0 ||
+      catsUnique.length > 0 ||
       (initial.location && initial.location.length > 0) ||
       (initial.date_from && initial.date_from.length > 0) ||
       (initial.date_to && initial.date_to.length > 0) ||
       initial.sort === "oldest"
     );
-  }, [initial, cats]);
+  }, [initial, catsUnique]);
 
-  // Build a URL from the form data
-  const buildUrlFromForm = useCallback((form: HTMLFormElement) => {
-    const fd = new FormData(form);
-    const params = new URLSearchParams();
+  // Build a URL from the current form values + provided categories (source of truth)
+  const buildUrl = useCallback(
+    (form: HTMLFormElement, categories: string[]) => {
+      const fd = new FormData(form);
+      const params = new URLSearchParams();
 
-    for (const [k, v] of fd.entries()) {
-      if (!v) continue;
-      if (k === "category") params.append("category", String(v));
-      else params.set(k, String(v));
-    }
+      // Copy all current fields except category (we'll re-append)
+      for (const [k, v] of fd.entries()) {
+        if (!v) continue;
+        if (k === "category") continue;
+        params.set(k, String(v));
+      }
 
-    const qs = params.toString();
-    return qs ? `/search?${qs}` : "/search";
-  }, []);
+      // Append categories from state (de-duped)
+      uniqueLabels(categories).forEach((c) => params.append("category", c));
 
-  // Update instantly on change
+      const qs = params.toString();
+      return qs ? `/search?${qs}` : "/search";
+    },
+    []
+  );
+
+  // Update instantly on change for non-category fields
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLFormElement>) => {
       const form = e.currentTarget;
-      router.replace(buildUrlFromForm(form));
+      router.replace(buildUrl(form, catsUnique));
     },
-    [router, buildUrlFromForm]
+    [router, buildUrl, catsUnique]
   );
 
-  // Toggle category chip
-  const toggleCat = (c: string) => {
+  // Toggle a category (normalize for compare; preserve label casing)
+  const toggleCat = (label: string) => {
+    const slug = normalize(label);
     setCats((prev) => {
-      const next = prev.includes(c)
-        ? prev.filter((x) => x !== c)
-        : [...prev, c];
+      // Map by normalized label to avoid dupes like Bottle/bottle
+      const bySlug = new Map(prev.map((l) => [normalize(l), l]));
+      if (bySlug.has(slug)) bySlug.delete(slug);
+      else bySlug.set(slug, label.trim());
 
+      const next = Array.from(bySlug.values());
+
+      // Reflect in URL immediately
       const form = formRef.current;
       if (form) {
-        Array.from(
-          form.querySelectorAll('input[type="hidden"][name="category"]')
-        ).forEach((el) => el.remove());
-        next.forEach((val) => {
-          const hidden = document.createElement("input");
-          hidden.type = "hidden";
-          hidden.name = "category";
-          hidden.value = val;
-          form.appendChild(hidden);
-        });
-        form.dispatchEvent(new Event("change", { bubbles: true }));
+        router.replace(buildUrl(form, next));
       }
       return next;
     });
@@ -107,9 +113,6 @@ export function FiltersSidebar({ initial }: Props) {
     const form = formRef.current;
     if (form) {
       form.reset();
-      Array.from(
-        form.querySelectorAll('input[type="hidden"][name="category"]')
-      ).forEach((el) => el.remove());
       router.replace("/search");
     }
   };
@@ -168,16 +171,24 @@ export function FiltersSidebar({ initial }: Props) {
         {/* Form */}
         <form
           ref={formRef}
-          action={BASE ? `${BASE}/search` : "/search"} // <— changed
+          action={BASE ? `${BASE}/search` : "/search"}
           method="get"
           className="space-y-5"
           onChange={onChange}
         >
+          {/* Preserve q in a hidden field so typing elsewhere keeps it */}
           {initial.q && (
             <input type="hidden" name="q" defaultValue={initial.q} />
           )}
-          {cats.map((c) => (
-            <input key={c} type="hidden" name="category" value={c} />
+
+          {/* Hidden inputs mirror de-duped category state */}
+          {catsUnique.map((c) => (
+            <input
+              key={`cat-${normalize(c)}`}
+              type="hidden"
+              name="category"
+              value={c}
+            />
           ))}
 
           {/* Category chips */}
@@ -190,10 +201,12 @@ export function FiltersSidebar({ initial }: Props) {
             </p>
             <div className="flex flex-wrap gap-2">
               {CATEGORY_OPTIONS.map((c) => {
-                const active = cats.includes(c);
+                const active = catsUnique.some(
+                  (x) => normalize(x) === normalize(c)
+                );
                 return (
                   <button
-                    key={c}
+                    key={`chip-${normalize(c)}`}
                     type="button"
                     onClick={() => toggleCat(c)}
                     className={`rounded-full px-3 py-1.5 text-sm transition shadow-sm ring-1 ${
@@ -264,8 +277,8 @@ export function FiltersSidebar({ initial }: Props) {
                   name="date_to"
                   defaultValue={initial.date_to ?? ""}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 
-                             px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 
-                             focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                              px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 
+                              focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
                 />
               </div>
             </div>

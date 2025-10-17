@@ -1,7 +1,7 @@
 // src/components/ItemForm.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -35,11 +35,33 @@ const ALLOWED_MIME = [
   "image/heif",
 ];
 
+/* ---- PaperGrid background (SSR-safe constants) ---- */
+const DOT_BG = encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
+);
+const PAPER_STYLE: React.CSSProperties = {
+  backgroundImage: `url("data:image/svg+xml,${DOT_BG}")`,
+  backgroundColor: "#fafbff",
+};
+
 export default function ItemForm() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Client-only default date to avoid hydration mismatch
+  const [dateFound, setDateFound] = useState<string>("");
+  useEffect(() => {
+    setDateFound(new Date().toISOString().slice(0, 10));
+  }, []);
+
+  // Local preview URL w/ cleanup
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  useEffect(() => {
+    return () => {
+      if (filePreview) URL.revokeObjectURL(filePreview);
+    };
+  }, [filePreview]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -138,11 +160,6 @@ export default function ItemForm() {
     router.push("/?posted=1");
   }
 
-  /* PaperGrid background like home */
-  const dot = encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
-  );
-
   return (
     <section className="mx-auto max-w-3xl">
       {/* Header with shield */}
@@ -172,10 +189,7 @@ export default function ItemForm() {
 
       <div
         className="rounded-3xl p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,.05)] bg-white dark:bg-gray-900"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,${dot}")`,
-          backgroundColor: "#fafbff",
-        }}
+        style={PAPER_STYLE}
       >
         {err && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/20 dark:text-red-200">
@@ -243,7 +257,7 @@ export default function ItemForm() {
               />
             </label>
 
-            {/* Date */}
+            {/* Date (controlled after mount) */}
             <label className="block">
               <span
                 className="mb-1 block text-sm font-medium"
@@ -255,7 +269,8 @@ export default function ItemForm() {
                 type="date"
                 name="date_found"
                 required
-                defaultValue={new Date().toISOString().slice(0, 10)}
+                value={dateFound}
+                onChange={(e) => setDateFound(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
                            px-3 py-2 text-sm shadow-sm outline-none focus:ring-2
                            focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
@@ -301,6 +316,7 @@ export default function ItemForm() {
                            focus:ring-2 focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
                 onChange={(e) => {
                   const f = e.currentTarget.files?.[0];
+                  if (filePreview) URL.revokeObjectURL(filePreview);
                   if (f) {
                     const url = URL.createObjectURL(f);
                     setFilePreview(url);
