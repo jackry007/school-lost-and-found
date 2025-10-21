@@ -24,6 +24,13 @@ type CardItem = {
   thumb: string;
 };
 
+type LiveStats = {
+  totalItems: number;
+  claimed: number;
+  recent: number;
+  claimRate: number; // 0-100
+};
+
 const BUCKET = "item-photos";
 const FALLBACK_THUMB = `${BASE}/no-image.png`;
 
@@ -59,12 +66,22 @@ export default function HomePage() {
   const [items, setItems] = useState<CardItem[]>([]);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // 🧮 Live stats
+  const [stats, setStats] = useState<LiveStats>({
+    totalItems: 0,
+    claimed: 0,
+    recent: 0,
+    claimRate: 0,
+  });
+
+  // Fetch public cards (only listed)
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
         .schema("public")
         .from("items")
         .select("id, title, location, category, date_found, photo_url, status")
+        .eq("status", "listed")
         .order("date_found", { ascending: false })
         .limit(8);
 
@@ -98,6 +115,41 @@ export default function HomePage() {
 
       setItems(mapped);
       setErrMsg(null);
+    })();
+  }, []);
+
+  // Fetch live stats
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: items, error } = await supabase
+          .from("items")
+          .select("id, created_at, status");
+
+        if (error) throw error;
+        if (!items) return;
+
+        const total = items.length;
+        const claimed = items.filter((it) => it.status === "claimed").length;
+        const listed = items.filter((it) => it.status === "listed").length;
+
+        const THIRTY_D_MS = 30 * 24 * 60 * 60 * 1000;
+        const recent = items.filter(
+          (it) => new Date(it.created_at).getTime() >= Date.now() - THIRTY_D_MS
+        ).length;
+
+        const denom = listed + claimed;
+        const claimRate = denom ? Math.round((claimed / denom) * 100) : 0;
+
+        setStats({
+          totalItems: total,
+          claimed,
+          recent,
+          claimRate,
+        });
+      } catch (e) {
+        console.error("Stats fetch failed:", e);
+      }
     })();
   }, []);
 
@@ -177,7 +229,7 @@ export default function HomePage() {
 
       {/* Sections */}
       <MissionSection />
-      <StatsSection />
+      <StatsSection stats={stats} />
       <TestimonialsSection />
       <StoriesSection />
 
@@ -404,14 +456,18 @@ function MissionSection() {
   );
 }
 
-/* ---------- Stats, Testimonials, Stories ---------- */
-// (keep your versions of StatsSection, QuoteCard, CaseFile, etc. unchanged)
-// — paste from your existing file below this point —
-/* ----- Stats ----- */
-function StatsSection() {
+/* ---------- Stats (LIVE) ---------- */
+function StatsSection({ stats }: { stats: LiveStats }) {
+  const { totalItems, claimed, recent, claimRate } = stats;
+
+  // Bars: keep them visually nice even when totals are small
+  const safePct = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+  const barTotal = safePct(Math.min(totalItems / 2, 100));
+  const barClaimed = totalItems ? safePct((claimed / totalItems) * 100) : 0;
+  const barRecent = totalItems ? safePct((recent / totalItems) * 100) : 0;
+
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      {/* (#8) py-8 -> py-10 to balance bands */}
       <SectionHeader title="Program stats" kicker="At a glance" />
       <motion.div
         variants={stagger}
@@ -420,14 +476,31 @@ function StatsSection() {
         viewport={{ once: true, amount: 0.2 }}
         className="grid grid-cols-2 gap-4 md:grid-cols-4"
       >
-        <CreekStat icon="🧾" label="Total items logged" value="128" bar={88} />
-        <CreekStat icon="🎉" label="Items reunited" value="96" bar={72} />
-        <CreekStat icon="📆" label="Past 30 days" value="42" bar={40} />
-        <CreekStat icon="📈" label="Claim rate" value="75%" bar={75} />
+        <CreekStat
+          icon="🧾"
+          label="Total items logged"
+          value={totalItems}
+          bar={100}
+        />
+        <CreekStat
+          icon="🎉"
+          label="Items reunited"
+          value={claimed}
+          bar={barClaimed}
+        />
+        <CreekStat
+          icon="📆"
+          label="Past 30 days"
+          value={recent}
+          bar={barRecent}
+        />
+        <CreekStat
+          icon="📈"
+          label="Claim rate"
+          value={`${claimRate}%`}
+          bar={safePct(claimRate)}
+        />
       </motion.div>
-      <p className="mt-2 text-xs text-gray-500">
-        *Demo figures shown for layout — replace with live stats later.
-      </p>
     </section>
   );
 }
@@ -479,7 +552,6 @@ function CreekStat({
 function TestimonialsSection() {
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      {/* (#8) py-12 -> py-10 */}
       <SectionHeader title="What people say" />
       <motion.div
         variants={stagger}

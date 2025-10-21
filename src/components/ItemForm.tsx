@@ -72,7 +72,7 @@ export default function ItemForm() {
     const formData = new FormData(form);
 
     const title = String(formData.get("title") || "").trim();
-    const location_found = String(formData.get("location_found") || "").trim();
+    const location = String(formData.get("location") || "").trim();
     const category = (String(formData.get("category") || "Misc").trim() ||
       "Misc") as Category;
     const date_found = String(formData.get("date_found") || "").trim();
@@ -141,10 +141,10 @@ export default function ItemForm() {
       const { error: insertErr } = await supabase.from("items").insert([
         {
           title,
-          location_found,
+          location,
           category,
           date_found,
-          status: "listed",
+          status: "pending",
           photo_url: photo_path,
           notes,
         },
@@ -249,7 +249,7 @@ export default function ItemForm() {
                 Location found
               </span>
               <input
-                name="location_found"
+                name="location"
                 placeholder="e.g., Library 2F"
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
                            px-3 py-2 text-sm shadow-sm outline-none focus:ring-2

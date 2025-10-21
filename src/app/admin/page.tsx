@@ -1,21 +1,159 @@
 // src/app/admin/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Item, Claim } from "@/lib/types";
 
-// Local widen so we can compare to 'pending'/'rejected' without changing your global Item type yet.
+/* =========================================================
+   Types / palette
+   ======================================================= */
 type ItemStatusWidened = Item["status"] | "pending" | "rejected";
 type StatusFilter = "all" | "pending" | "listed" | "claimed" | "rejected";
 
-// Creek-ish palette (using Tailwind arbitrary colors)
 const CREEK_RED = "#b10015"; // deep scarlet
 const CREEK_NAVY = "#0f2741"; // dark navy
 const CREEK_SOFTR = "#fef2f3"; // soft red tint
 const CREEK_SOFTN = "#f1f5fb"; // soft navy tint
 
+/* =========================================================
+   Tiny Toast system (self-contained)
+   ======================================================= */
+type Toast = {
+  id: number;
+  msg: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
+
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const add = (
+    msg: string,
+    opts?: { actionLabel?: string; onAction?: () => void; ttl?: number }
+  ) => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((t) => [
+      ...t,
+      { id, msg, actionLabel: opts?.actionLabel, onAction: opts?.onAction },
+    ]);
+    const ttl = opts?.ttl ?? 3000;
+    if (!opts?.onAction) {
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+    }
+    return id;
+  };
+  const remove = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
+  const node = (
+    <div className="fixed right-3 top-3 z-[100] space-y-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="flex items-center gap-3 rounded-md bg-gray-900/95 px-3 py-2 text-sm text-white shadow-lg"
+        >
+          <span>{t.msg}</span>
+          {t.actionLabel && (
+            <button
+              className="rounded border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10"
+              onClick={() => {
+                t.onAction?.();
+                remove(t.id);
+              }}
+            >
+              {t.actionLabel}
+            </button>
+          )}
+          <button
+            className="ml-1 rounded px-2 py-0.5 text-xs text-white/70 hover:bg-white/10"
+            onClick={() => remove(t.id)}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+  return { add, remove, node };
+}
+
+/* =========================================================
+   Confirm Modal (no window.confirm)
+   ======================================================= */
+function ConfirmModal({
+  open,
+  title,
+  children,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+  busy = false,
+}: {
+  open: boolean;
+  title: string;
+  children?: React.ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy?: boolean;
+}) {
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!open) return;
+      if (e.key === "Escape") onCancel();
+      if (e.key === "Enter") onConfirm();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onCancel, onConfirm]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="w-[95%] max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div
+            className="px-4 py-3 text-white"
+            style={{
+              background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+            }}
+          >
+            <h3 className="text-base font-semibold">{title}</h3>
+          </div>
+          <div className="p-4 text-sm text-gray-800">{children}</div>
+          <div className="flex justify-end gap-2 p-4 pt-0">
+            <button
+              onClick={onCancel}
+              disabled={busy}
+              className="rounded-md border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+            >
+              {cancelLabel}
+            </button>
+            <button
+              ref={confirmRef}
+              onClick={onConfirm}
+              disabled={busy}
+              className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+              style={{ backgroundColor: CREEK_RED }}
+            >
+              {busy ? "Working…" : confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   Page
+   ======================================================= */
 export default function AdminPage() {
   const router = useRouter();
   const [role, setRole] = useState<"admin" | "staff" | "user" | null>(null);
@@ -23,17 +161,25 @@ export default function AdminPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ---- Tier 1: filters + search + inline edit modal ----
+  // filters / search / edit
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
   const [q, setQ] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [editForm, setEditForm] = useState<Partial<Item>>({});
 
+  // approve modal state
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [approveBusy, setApproveBusy] = useState(false);
+  const [approveTarget, setApproveTarget] = useState<Item | null>(null);
+
+  // toasts
+  const { add: addToast, node: toastNode } = useToasts();
+
+  /* ---------------- Auth + load ---------------- */
   const load = async () => {
     setLoading(true);
 
-    // --- auth/role guard ---
     const { data: userRes } = await supabase.auth.getUser();
     const uid = userRes.user?.id;
     if (!uid) {
@@ -54,7 +200,6 @@ export default function AdminPage() {
     }
     setRole(prof.role as "admin" | "staff");
 
-    // --- fetch items/claims ---
     const [{ data: its }, { data: cls }] = await Promise.all([
       supabase
         .from("items")
@@ -76,7 +221,14 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ===== Actions =====
+  /* ---------------- Helpers: optimistic moves ---------------- */
+  function moveItemLocally(id: number, status: ItemStatusWidened) {
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? ({ ...it, status } as Item) : it))
+    );
+  }
+
+  /* ---------------- Actions ---------------- */
   const signOut = async () => {
     await supabase.auth.signOut();
     setRole(null);
@@ -86,36 +238,95 @@ export default function AdminPage() {
   };
 
   const updateClaim = async (id: number, status: "approved" | "rejected") => {
-    if (!confirm(`Set claim #${id} → ${status}?`)) return;
+    // Quick modal not necessary—low risk
     const { error } = await supabase
       .from("claims")
       .update({ status })
       .eq("id", id);
-    if (error) return alert(error.message);
+    if (error) return addToast(`Claim update failed: ${error.message}`);
+    addToast(`Claim #${id} → ${status}`);
     load();
   };
 
   const markItemClaimed = async (id: number) => {
-    if (!confirm(`Mark item #${id} as claimed?`)) return;
     const { error } = await supabase
       .from("items")
       .update({ status: "claimed" })
       .eq("id", id);
-    if (error) return alert(error.message);
-    load();
+    if (error) return addToast(`Error: ${error.message}`);
+    moveItemLocally(id, "claimed");
+    addToast(`Item #${id} marked claimed.`);
   };
 
-  const updateItemStatus = async (
-    id: number,
-    status: "listed" | "rejected"
-  ) => {
-    if (!confirm(`Set item #${id} → ${status}?`)) return;
+  const restoreToListed = async (id: number) => {
+    const { error } = await supabase
+      .from("items")
+      .update({ status: "listed" })
+      .eq("id", id);
+    if (error) return addToast(`Error: ${error.message}`);
+    moveItemLocally(id, "listed");
+    addToast(`Item #${id} restored to Listed.`);
+  };
+
+  // OPEN modal for approve/reject
+  const askApprove = (it: Item) => {
+    setApproveTarget(it);
+    setApproveOpen(true);
+  };
+
+  // Approve & List with optimistic + undo
+  const confirmApprove = async () => {
+    if (!approveTarget) return;
+    const id = approveTarget.id;
+    setApproveBusy(true);
+
+    // optimistic move
+    moveItemLocally(id, "listed");
+    setApproveOpen(false);
+    setApproveBusy(false);
+
+    // show undo toast (5s)
+    let undone = false;
+    const toastId = addToast(`Approved: “${approveTarget.title}”`, {
+      actionLabel: "Undo (5s)",
+      ttl: 5000,
+      onAction: async () => {
+        undone = true;
+        await supabase.from("items").update({ status: "pending" }).eq("id", id);
+        moveItemLocally(id, "pending");
+      },
+    });
+
+    // persist
+    const { error } = await supabase
+      .from("items")
+      .update({ status: "listed" })
+      .eq("id", id);
+    if (error) {
+      // revert optimistic on error
+      moveItemLocally(id, "pending");
+      addToast(`Error listing item: ${error.message}`);
+      return;
+    }
+
+    // if no undo after 5s, nothing to do
+    setTimeout(() => {
+      if (!undone) {
+        // could log audit here
+      }
+    }, 5200);
+  };
+
+  // Reject (simple modal inline)
+  const updateItemStatus = async (id: number, status: "rejected") => {
+    // quick confirm with a light modal could be added; keeping simple
     const { error } = await supabase
       .from("items")
       .update({ status })
       .eq("id", id);
-    if (error) return alert(error.message);
-    load();
+    if (error) return addToast(`Error: ${error.message}`);
+    moveItemLocally(id, "rejected");
+    addToast(`Item #${id} → rejected`);
   };
 
   // Inline Edit
@@ -124,7 +335,7 @@ export default function AdminPage() {
     setEditForm({
       title: it.title,
       category: it.category,
-      // @ts-expect-error we treat location as part of your Item table
+      // @ts-expect-error your table has location
       location: (it as any).location ?? null,
       description: it.description,
     });
@@ -145,24 +356,20 @@ export default function AdminPage() {
       .from("items")
       .update(payload)
       .eq("id", editItem.id);
-    if (error) return alert(error.message);
+    if (error) return addToast(`Save failed: ${error.message}`);
     setEditOpen(false);
     setEditItem(null);
     setEditForm({});
-    load();
+    // local patch instead of full reload:
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === editItem.id ? ({ ...it, ...payload } as Item) : it
+      )
+    );
+    addToast("Changes saved.");
   };
 
-  const restoreToListed = async (id: number) => {
-    if (!confirm(`Restore item #${id} back to 'listed'?`)) return;
-    const { error } = await supabase
-      .from("items")
-      .update({ status: "listed" })
-      .eq("id", id);
-    if (error) return alert(error.message);
-    load();
-  };
-
-  // ===== Derived data =====
+  /* ---------------- Derived ---------------- */
   const pendingItems = items.filter(
     (i) => (i.status as ItemStatusWidened) === "pending"
   );
@@ -182,7 +389,6 @@ export default function AdminPage() {
     });
   }, [items, statusFilter, q]);
 
-  // ===== Tier 2 Analytics =====
   const {
     totalItems,
     totalClaims,
@@ -248,20 +454,27 @@ export default function AdminPage() {
     };
   }, [items, claims]);
 
+  /* ---------------- Render ---------------- */
   if (loading) {
     return (
       <div className="min-h-[60vh]">
         <Header role={role} onSignOut={signOut} />
-        <div className="animate-pulse max-w-6xl mx-auto p-6 space-y-6">
-          <div className="h-24 rounded-2xl bg-gray-100" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="mx-auto max-w-6xl space-y-6 p-6">
+          <div className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-24 rounded-xl bg-gray-100" />
+              <div
+                key={i}
+                className="h-24 animate-pulse rounded-xl bg-gray-100"
+              />
             ))}
           </div>
-          <div className="h-10 rounded-xl bg-gray-100" />
+          <div className="h-10 animate-pulse rounded-xl bg-gray-100" />
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-gray-100" />
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-xl bg-gray-100"
+            />
           ))}
         </div>
       </div>
@@ -272,10 +485,10 @@ export default function AdminPage() {
     <div>
       <Header role={role} onSignOut={signOut} />
 
-      <main className="max-w-6xl mx-auto p-6 space-y-10">
+      <main className="mx-auto max-w-6xl space-y-10 p-6">
         {/* Analytics */}
         <section>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <StatCard
               label="Total items"
               value={totalItems}
@@ -290,7 +503,7 @@ export default function AdminPage() {
             <StatCard label="Claimed" value={claimedCount} tint="#eefcf3" />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             <StatCard label="Pending" value={pendingCount} tint="#fff6e8" />
             <StatCard label="Rejected" value={rejectedCount} tint="#fdeff0" />
             <StatCard
@@ -299,11 +512,11 @@ export default function AdminPage() {
               tint="#f5f7ff"
             />
             <Card className="p-4">
-              <div className="text-xs text-gray-500 mb-2">
+              <div className="mb-2 text-xs text-gray-500">
                 Top categories (30d)
               </div>
               {topCats.length ? (
-                <ul className="text-sm space-y-1">
+                <ul className="space-y-1 text-sm">
                   {topCats.map(([k, v]) => (
                     <li key={k} className="flex justify-between">
                       <span className="truncate">{k}</span>
@@ -317,12 +530,12 @@ export default function AdminPage() {
             </Card>
           </div>
 
-          <Card className="p-4 mt-4">
-            <div className="text-xs text-gray-500 mb-2">
+          <Card className="mt-4 p-4">
+            <div className="mb-2 text-xs text-gray-500">
               Top locations (30d)
             </div>
             {topLocs.length ? (
-              <ul className="text-sm grid gap-1 sm:grid-cols-2">
+              <ul className="grid gap-1 text-sm sm:grid-cols-2">
                 {topLocs.map(([k, v]) => (
                   <li key={k} className="flex justify-between">
                     <span className="truncate">{k}</span>
@@ -352,11 +565,8 @@ export default function AdminPage() {
                   } · submitted ${new Date(it.created_at).toLocaleString()}`}
                 />
                 <RowActions>
-                  <Btn
-                    tone="primary"
-                    onClick={() => updateItemStatus(it.id, "listed")}
-                  >
-                    Approve & List
+                  <Btn tone="primary" onClick={() => askApprove(it)}>
+                    Approve &amp; List
                   </Btn>
                   <Btn
                     tone="danger"
@@ -434,12 +644,9 @@ export default function AdminPage() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search items…"
                 className="w-full rounded-full border px-4 py-2 pl-10 outline-none focus:ring-2"
-                style={{
-                  borderColor: "#e5e7eb",
-                  boxShadow: `0 0 0 0 rgba(0,0,0,0)`,
-                }}
+                style={{ borderColor: "#e5e7eb" }}
               />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 🔎
               </span>
             </div>
@@ -465,11 +672,8 @@ export default function AdminPage() {
                   <RowActions>
                     {s === "pending" && (
                       <>
-                        <Btn
-                          tone="primary"
-                          onClick={() => updateItemStatus(it.id, "listed")}
-                        >
-                          Approve & List
+                        <Btn tone="primary" onClick={() => askApprove(it)}>
+                          Approve &amp; List
                         </Btn>
                         <Btn
                           tone="danger"
@@ -524,7 +728,7 @@ export default function AdminPage() {
         </section>
       </main>
 
-      {/* ---- Inline Edit Modal ---- */}
+      {/* Edit Modal */}
       {editOpen && editItem && (
         <Modal
           onClose={() => setEditOpen(false)}
@@ -533,7 +737,7 @@ export default function AdminPage() {
           <div className="grid gap-3">
             <Labeled label="Title">
               <input
-                className="border rounded-xl px-3 py-2"
+                className="rounded-xl border px-3 py-2"
                 value={editForm.title ?? ""}
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, title: e.target.value }))
@@ -543,7 +747,7 @@ export default function AdminPage() {
 
             <Labeled label="Category">
               <input
-                className="border rounded-xl px-3 py-2"
+                className="rounded-xl border px-3 py-2"
                 value={editForm.category ?? ""}
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, category: e.target.value }))
@@ -553,7 +757,7 @@ export default function AdminPage() {
 
             <Labeled label="Location">
               <input
-                className="border rounded-xl px-3 py-2"
+                className="rounded-xl border px-3 py-2"
                 value={((editForm as any).location ?? "") as string}
                 onChange={(e) =>
                   setEditForm((f) => ({
@@ -566,7 +770,7 @@ export default function AdminPage() {
 
             <Labeled label="Description">
               <textarea
-                className="border rounded-xl px-3 py-2 min-h-28"
+                className="min-h-28 rounded-xl border px-3 py-2"
                 value={editForm.description ?? ""}
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, description: e.target.value }))
@@ -575,7 +779,7 @@ export default function AdminPage() {
             </Labeled>
           </div>
 
-          <div className="flex items-center justify-end gap-2 mt-4">
+          <div className="mt-4 flex items-center justify-end gap-2">
             <Btn tone="ghost" onClick={() => setEditOpen(false)}>
               Cancel
             </Btn>
@@ -585,6 +789,27 @@ export default function AdminPage() {
           </div>
         </Modal>
       )}
+
+      {/* Approve Modal */}
+      <ConfirmModal
+        open={approveOpen}
+        busy={approveBusy}
+        title="Approve this item?"
+        confirmLabel="Approve & List"
+        onCancel={() => setApproveOpen(false)}
+        onConfirm={confirmApprove}
+      >
+        {approveTarget ? (
+          <p>
+            Set <strong>#{approveTarget.id}</strong> — “{approveTarget.title}”
+            to <strong>listed</strong>? It will appear publicly in Search and
+            the home page.
+          </p>
+        ) : null}
+      </ConfirmModal>
+
+      {/* Toast outlet */}
+      {toastNode}
     </div>
   );
 }
@@ -605,7 +830,7 @@ function Header({
         background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
       }}
     >
-      <div className="max-w-6xl mx-auto px-6 py-6 text-white flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-6 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             Admin Dashboard
@@ -616,13 +841,13 @@ function Header({
         </div>
         <div className="flex items-center gap-3">
           {role && (
-            <span className="text-xs rounded-full px-2 py-1 bg-white/10 ring-1 ring-white/20">
+            <span className="rounded-full bg-white/10 px-2 py-1 text-xs ring-1 ring-white/20">
               Signed in as <strong className="font-semibold">{role}</strong>
             </span>
           )}
           <button
             onClick={onSignOut}
-            className="px-3 py-1.5 rounded-full bg-white text-[13px] font-medium hover:bg-white/90 shadow"
+            className="rounded-full bg-white px-3 py-1.5 text-[13px] font-medium shadow hover:bg-white/90"
           >
             Sign out
           </button>
@@ -634,7 +859,7 @@ function Header({
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-lg font-semibold flex items-center gap-2">
+    <h2 className="flex items-center gap-2 text-lg font-semibold">
       {children}
     </h2>
   );
@@ -654,7 +879,7 @@ function Badge({
     red: "bg-rose-100 text-rose-800",
   };
   return (
-    <span className={`px-2 py-0.5 text-xs rounded-full ${tones[tone]}`}>
+    <span className={`rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -670,8 +895,9 @@ function Card({
   return (
     <div
       className={`rounded-2xl border border-gray-200 bg-white shadow-sm ${className}`}
-      children={children}
-    />
+    >
+      {children}
+    </div>
   );
 }
 
@@ -686,11 +912,11 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4"
+      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
       style={{ background: `linear-gradient(180deg, ${tint} 0%, white 60%)` }}
     >
       <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-2xl font-semibold mt-1 tracking-tight">{value}</div>
+      <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
     </div>
   );
 }
@@ -707,7 +933,7 @@ function Pill({
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm shadow-sm border transition ${
+      className={`rounded-full border px-3 py-1.5 text-sm shadow-sm transition ${
         active ? "text-white" : "text-gray-700 hover:bg-gray-50"
       }`}
       style={{
@@ -724,7 +950,7 @@ function Pill({
 
 function Row({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 flex items-center justify-between">
+    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       {children}
     </div>
   );
@@ -747,9 +973,9 @@ function RowInfo({
 }) {
   return (
     <div className="min-w-0">
-      <div className="font-medium truncate">{title}</div>
+      <div className="truncate font-medium">{title}</div>
       {meta && (
-        <div className="text-xs text-gray-600 mt-0.5 flex items-center gap-1">
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-600">
           {meta}
         </div>
       )}
@@ -758,7 +984,7 @@ function RowInfo({
 }
 
 function RowActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex gap-2 shrink-0">{children}</div>;
+  return <div className="flex shrink-0 gap-2">{children}</div>;
 }
 
 function Btn({
@@ -786,7 +1012,7 @@ function Btn({
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm ${styles[tone]}`}
+      className={`rounded-full px-3 py-1.5 text-sm ${styles[tone]}`}
       style={{ background }}
     >
       {children}
@@ -804,7 +1030,7 @@ function StatusBadge({ status }: { status: ItemStatusWidened }) {
       ? "bg-emerald-100 text-emerald-800"
       : "bg-rose-100 text-rose-800";
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[11px] ${look}`}>
+    <span className={`rounded-full px-2 py-0.5 text-[11px] ${look}`}>
       {status}
     </span>
   );
@@ -823,9 +1049,9 @@ function Modal({
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl w-[95%] max-w-lg shadow-2xl border border-gray-200">
+        <div className="w-[95%] max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl">
           <div
-            className="px-4 py-3 rounded-t-2xl text-white"
+            className="rounded-t-2xl px-4 py-3 text-white"
             style={{
               background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
             }}
