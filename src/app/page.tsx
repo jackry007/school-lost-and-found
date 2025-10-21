@@ -25,13 +25,13 @@ type CardItem = {
 };
 
 const BUCKET = "item-photos";
-const FALLBACK_THUMB = `${BASE}/no-image.png`; // <— changed
+const FALLBACK_THUMB = `${BASE}/no-image.png`;
 
 /* ---------- Brand tokens ---------- */
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
 
-/* ---------- Anim variants ---------- */
+/* ---------- Anim variants (SLOWER) ---------- */
 const easeOutQuint: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const fadeUp: Variants = {
@@ -40,7 +40,7 @@ const fadeUp: Variants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.45, ease: easeOutQuint },
+    transition: { duration: 1.0, ease: easeOutQuint },
   },
 };
 
@@ -48,9 +48,11 @@ const stagger: Variants = {
   hidden: { opacity: 1 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.06, delayChildren: 0.05 },
+    transition: { staggerChildren: 0.14, delayChildren: 0.12 },
   },
 };
+
+const HOVER_SPRING = { type: "spring", stiffness: 220, damping: 28 } as const;
 
 /* ---------- Page ---------- */
 export default function HomePage() {
@@ -62,11 +64,9 @@ export default function HomePage() {
       const { data, error } = await supabase
         .schema("public")
         .from("items")
-        .select(
-          "id, title, location, category, date_found, photo_url, status"
-        )
+        .select("id, title, location, category, date_found, photo_url, status")
         .order("date_found", { ascending: false })
-        .limit(8); // (#8) denser "Recently Reported"
+        .limit(8);
 
       if (error) {
         setErrMsg(error.message);
@@ -103,7 +103,6 @@ export default function HomePage() {
 
   return (
     <CreekPageShell>
-      {/* (#1) soft background wrapper */}
       {/* 🌄 HERO */}
       <section className="relative min-h-[68vh] md:h-[520px] w-full overflow-hidden">
         <img
@@ -122,7 +121,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 1.1, ease: easeOutQuint }}
             className="max-w-xl text-white"
           >
             <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
@@ -131,17 +130,21 @@ export default function HomePage() {
             <p className="mt-3 text-white/95">
               Fast, fair, and secure—get belongings back where they belong.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              {/* Primary */}
               <Link
                 href="/report"
-                className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-md transition"
+                className="inline-flex h-[42px] items-center justify-center rounded-lg px-5 text-sm font-semibold text-white shadow-md transition no-underline"
                 style={{ backgroundColor: CREEK_RED }}
               >
                 Report Found Item
               </Link>
+
+              {/* Secondary (ghost) */}
               <Link
                 href="/search"
-                className="rounded-lg border border-white/80 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex h-[42px] items-center justify-center rounded-lg border border-white/80 px-5 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{ ["--tw-ring-color" as any]: CREEK_NAVY }}
               >
                 Browse Items
               </Link>
@@ -153,7 +156,7 @@ export default function HomePage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: 0.4, duration: 1.0, ease: easeOutQuint }}
           className="absolute bottom-6 left-1/2 -translate-x-1/2"
         >
           <div className="mx-auto inline-flex items-center gap-3 rounded-full bg-white/95 px-4 py-2 text-sm font-medium text-gray-800 shadow-lg backdrop-blur">
@@ -164,7 +167,6 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-      {/* (#2) Creek ribbon under hero */}
       <CreekRibbon />
 
       {errMsg && (
@@ -173,7 +175,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ===== CCHS UNIQUE SECTIONS ===== */}
+      {/* Sections */}
       <MissionSection />
       <StatsSection />
       <TestimonialsSection />
@@ -229,12 +231,10 @@ export default function HomePage() {
   );
 }
 
-/* ===================== Unique Section Components ===================== */
-
+/* ---------- SectionHeader ---------- */
 function SectionHeader({ title, kicker }: { title: string; kicker?: string }) {
   return (
     <div className="mb-5">
-      {/* (#8) slightly tighter */}
       {kicker && (
         <div
           className="inline-block rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-white"
@@ -244,13 +244,7 @@ function SectionHeader({ title, kicker }: { title: string; kicker?: string }) {
         </div>
       )}
       <div className="mt-2 flex items-center gap-3">
-        <svg
-          width="28"
-          height="32"
-          viewBox="0 0 24 28"
-          aria-hidden
-          className="drop-shadow-sm"
-        >
+        <svg width="28" height="32" viewBox="0 0 24 28" aria-hidden>
           <path
             d="M12 0l10 4v8c0 7-5 12-10 16C7 24 2 19 2 12V4l10-4z"
             fill={CREEK_RED}
@@ -282,7 +276,7 @@ function SectionHeader({ title, kicker }: { title: string; kicker?: string }) {
   );
 }
 
-/* (#1) PageShell with subtle gradient + dot texture */
+/* ---------- Page Shell ---------- */
 function CreekPageShell({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -301,7 +295,7 @@ function CreekPageShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* (#2) Creek ribbon (red/navy diagonal) */
+/* ---------- Creek Ribbon ---------- */
 function CreekRibbon() {
   return (
     <div
@@ -314,6 +308,7 @@ function CreekRibbon() {
   );
 }
 
+/* ---------- Paper Grid ---------- */
 function PaperGrid({ children }: { children: React.ReactNode }) {
   const dot = encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
@@ -331,15 +326,13 @@ function PaperGrid({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ----- Mission ----- */
+/* ---------- Mission Section ---------- */
 function MissionSection() {
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      {/* (#8) py-14 -> py-10 */}
       <SectionHeader title="Our Mission" kicker="Cherry Creek" />
       <PaperGrid>
         <div className="grid items-start gap-8 md:grid-cols-2">
-          {/* (#8) gap-10 -> gap-8 */}
           <div>
             <p className="text-lg leading-relaxed text-gray-700">
               We help students and staff reunite with their belongings quickly
@@ -367,7 +360,8 @@ function MissionSection() {
                   variants={fadeUp}
                   whileHover={{ y: -6, scale: 1.02 }}
                   whileTap={{ scale: 0.985 }}
-                  className="rounded-2xl bg-white p-4 text-center shadow-sm will-change-transform hover:shadow-lg"
+                  transition={HOVER_SPRING}
+                  className="rounded-2xl bg-white p-4 text-center shadow-sm hover:shadow-lg"
                 >
                   <div
                     className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg"
@@ -391,16 +385,13 @@ function MissionSection() {
           </div>
 
           <div className="relative w-full">
-            <div
-              className="rounded-2xl border bg-white p-2 shadow-md"
-              style={{ borderColor: "#E5E7EB" }}
-            >
+            <div className="rounded-2xl border bg-white p-2 shadow-md">
               <motion.img
                 src={`${BASE}/images/LostBackpack.png`}
                 alt="Students reuniting with a backpack at the office"
                 className="h-72 w-full rounded-xl object-cover"
                 whileHover={{ scale: 1.03 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.8, ease: easeOutQuint }}
               />
             </div>
             <p className="mt-3 text-center text-sm text-gray-500">
@@ -413,6 +404,9 @@ function MissionSection() {
   );
 }
 
+/* ---------- Stats, Testimonials, Stories ---------- */
+// (keep your versions of StatsSection, QuoteCard, CaseFile, etc. unchanged)
+// — paste from your existing file below this point —
 /* ----- Stats ----- */
 function StatsSection() {
   return (

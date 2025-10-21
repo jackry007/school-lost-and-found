@@ -1,11 +1,11 @@
 "use client";
 
 // Cherry Creek HS — Lost & Found • FAQ (animated, refined, slowed)
-// - Two-column layout (FAQs + on-page index)
+// - Two-column layout (FAQs + important sidebar)
 // - Brand ribbon + big headline
 // - Animated accordion cards with rotating chevrons
 // - Strong focus states, dark-mode friendly
-// - FAQPage JSON-LD preserved
+// - FAQPage JSON-LD preserved (top 8 prioritized)
 // - Micro-interactions: hover-lift, list stagger, scroll progress, active TOC
 // - Reduced-motion friendly
 // - Slower timings so users can see the motion
@@ -179,9 +179,9 @@ export default function FAQPage() {
         q: "Where and when is pickup?",
         a: (
           <>
-            <strong>Location:</strong> Main Office. <strong>Hours:</strong>{" "}
-            Mon–Fri, 7:30a–3:30p. Bring your ID. If you can’t make those hours,
-            use the{" "}
+            <strong>Location:</strong> Security Office, located in the East
+            Building. <strong>Hours:</strong> Mon–Fri, 7:30a–3:30p. Bring your
+            ID. If you can’t make those hours, use the{" "}
             <Link href="/contact" className="underline">
               Contact
             </Link>{" "}
@@ -194,7 +194,7 @@ export default function FAQPage() {
         q: "How long are items kept?",
         a: (
           <>
-            Items are held up to <strong>30 days</strong>. After that, they may
+            Items are held up to <strong>60 days</strong>. After that, they may
             be donated or recycled per school policy.
           </>
         ),
@@ -204,12 +204,13 @@ export default function FAQPage() {
         q: "Can I edit or remove a report I submitted?",
         a: (
           <>
-            Yes. If you posted while signed in, you can edit from your
-            dashboard. Otherwise, request a change via the{" "}
+            You can’t directly edit or delete a report yourself. If you need to
+            make a change, please contact the Lost &amp; Found staff using the{" "}
             <Link href="/contact" className="underline">
               Contact
             </Link>{" "}
-            page (include the item link or ID).
+            page and include your item link or description. A staff member will
+            review and update it for you.
           </>
         ),
       },
@@ -249,9 +250,11 @@ export default function FAQPage() {
         q: "What data do you collect and why?",
         a: (
           <>
-            We store item details/photos, timestamps, and (for signed-in users)
-            your school email/UID to run the service, prevent abuse, and verify
-            claims. See the{" "}
+            We collect only the information needed to manage lost and found
+            items — this includes photos, item details, and timestamps. When a
+            claim is made, students or staff must show a school ID to verify
+            ownership. No personal accounts or logins are used. For details, see
+            the{" "}
             <Link href="/privacy" className="underline">
               Privacy Policy
             </Link>
@@ -286,6 +289,123 @@ export default function FAQPage() {
           </>
         ),
       },
+
+      /* -------------------- High-value additions -------------------- */
+      {
+        id: "pending-review",
+        q: "What does ‘Pending Review’ mean?",
+        a: (
+          <>
+            Your submission is in the moderation queue so we can prevent spam
+            and protect sensitive info. Reviews typically take{" "}
+            <strong>1 school day</strong>. You’ll see it listed after approval.
+          </>
+        ),
+      },
+      {
+        id: "device-found",
+        q: "I found a phone/laptop—what should I do?",
+        a: (
+          <>
+            Please <strong>do not</strong> post serial numbers or screen photos.
+            Turn devices in to the <strong>Main Office </strong>
+            immediately. We verify ownership at pickup (lock screen name, case
+            details, etc.). Lost devices aren’t publicly listed.
+          </>
+        ),
+      },
+      {
+        id: "sensitive-items",
+        q: "Are IDs, meds, or keys listed publicly?",
+        a: (
+          <>
+            No. <strong>Sensitive items</strong> (IDs, medications, credit
+            cards, house/car keys) are held securely and handled by staff only.
+            Use{" "}
+            <Link href="/contact" className="underline">
+              Contact
+            </Link>{" "}
+            if you’re looking for one.
+          </>
+        ),
+      },
+      {
+        id: "prove-ownership",
+        q: "How do I prove an item is mine without giving away clues?",
+        a: (
+          <>
+            When submitting a claim, share <strong>partial/obscured </strong>
+            details: the first/last letters of a name, a unique sticker’s theme,
+            or a small scratch location—things not visible in photos.
+          </>
+        ),
+      },
+      {
+        id: "false-claims",
+        q: "What happens if someone falsely claims an item?",
+        a: (
+          <>
+            Claims are verified in person using a school ID and any matching
+            details about the item. For unique items, staff will ask about
+            features only the real owner would know. For common items (like
+            plain water bottles), staff rely on where and when it was lost or
+            found, and use their judgment. If someone knowingly gives false
+            information, staff may report it to school administration for
+            follow-up.
+          </>
+        ),
+      },
+      {
+        id: "after-60-days",
+        q: "What happens after 60 days?",
+        a: (
+          <>
+            Unclaimed items may be <strong>donated or recycled</strong> per
+            school policy. Valuables are handled by staff with extended hold at
+            their discretion. See also{" "}
+            <a href="#timeline" className="underline">
+              How long are items kept?
+            </a>
+          </>
+        ),
+      },
+      {
+        id: "not-upload",
+        q: "What items should I not upload?",
+        a: (
+          <>
+            Don’t upload photos of faces or private info, and do not post
+            weapons/vapes, perishables, or unsafe items. Bring those to the
+            <strong> Main Office</strong>—don’t post.
+          </>
+        ),
+      },
+      {
+        id: "off-campus",
+        q: "Can I report items found off-campus?",
+        a: (
+          <>
+            We focus on <strong>on-campus</strong> finds. For off-campus
+            locations, use that venue’s lost &amp; found. If it was at a school
+            event, submit and note the event.
+          </>
+        ),
+      },
+      {
+        id: "data-removal",
+        q: "How do I remove my data?",
+        a: (
+          <>
+            If you’d like a photo or report removed, please contact the Lost
+            &amp; Found staff using the{" "}
+            <Link href="/contact" className="underline">
+              Contact
+            </Link>{" "}
+            page. Include the item details or link, and we’ll review and remove
+            it if appropriate.
+          </>
+        ),
+      },
     ],
     []
   );
@@ -315,6 +435,39 @@ export default function FAQPage() {
 
     return () => observer.disconnect();
   }, [faqs]);
+
+  /* Build the Top 8 for JSON-LD (rich results) */
+  const jsonLdTop8Order = [
+    "report-found",
+    "claim-verify",
+    "pickup-times",
+    "timeline",
+    "device-found",
+    "sensitive-items",
+    "pending-review",
+    "not-upload",
+  ];
+
+  const jsonLdFaqs = faqs
+    .filter((f) => jsonLdTop8Order.includes(f.id))
+    .sort(
+      (a, b) => jsonLdTop8Order.indexOf(a.id) - jsonLdTop8Order.indexOf(b.id)
+    );
+
+  /* Curated important questions (sidebar) */
+  const importantIds = [
+    "report-found",
+    "claim-verify",
+    "pickup-times",
+    "timeline",
+    "device-found",
+    "sensitive-items",
+    "not-upload",
+  ];
+
+  const importantFaqs = faqs
+    .filter((f) => importantIds.includes(f.id))
+    .sort((a, b) => importantIds.indexOf(a.id) - importantIds.indexOf(b.id));
 
   return (
     <MotionConfig reducedMotion="user">
@@ -396,10 +549,11 @@ export default function FAQPage() {
             </motion.div>
 
             {/* Quick actions */}
-            <section className="mt-8 flex flex-wrap gap-3">
+            <section className="mt-8 flex flex-wrap items-center gap-3">
+              {/* Primary (red) */}
               <Link
                 href="/report"
-                className="rounded-md px-4 py-2 text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
+                className="inline-flex h-[42px] items-center justify-center rounded-md px-4 text-sm font-semibold text-white shadow-sm transition no-underline focus:outline-none focus:ring-2 focus:ring-offset-2"
                 style={{
                   backgroundColor: CREEK_RED,
                   ["--tw-ring-color" as any]: CREEK_NAVY,
@@ -407,9 +561,11 @@ export default function FAQPage() {
               >
                 Report Found Item
               </Link>
+
+              {/* Secondary (outlined) */}
               <Link
                 href="/search"
-                className="rounded-md underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 focus:ring-offset-2"
+                className="inline-flex h-[42px] items-center justify-center rounded-md border border-gray-300 px-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-800"
                 style={{ ["--tw-ring-color" as any]: CREEK_NAVY }}
               >
                 Browse Items
@@ -417,17 +573,17 @@ export default function FAQPage() {
             </section>
           </main>
 
-          {/* Right: On-page index */}
+          {/* Right: Important questions sidebar */}
           <aside
-            aria-label="On-page navigation"
+            aria-label="Important questions"
             className="lg:sticky lg:top-24 lg:h-[calc(100vh-6rem)]"
           >
             <div className="rounded-2xl border border-gray-200 bg-white/70 p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                On this page
+                Important questions from the FAQ
               </h2>
               <ul className="mt-3 space-y-2 text-sm">
-                {faqs.map((f) => {
+                {importantFaqs.map((f) => {
                   const active = activeId === f.id;
                   return (
                     <li key={f.id}>
@@ -469,7 +625,7 @@ export default function FAQPage() {
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "FAQPage",
-              mainEntity: faqs.slice(0, 8).map((f) => ({
+              mainEntity: jsonLdFaqs.map((f) => ({
                 "@type": "Question",
                 name: f.q,
                 acceptedAnswer: {
