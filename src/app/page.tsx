@@ -66,6 +66,10 @@ export default function HomePage() {
   const [items, setItems] = useState<CardItem[]>([]);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
+
   // 🧮 Live stats
   const [stats, setStats] = useState<LiveStats>({
     totalItems: 0,
