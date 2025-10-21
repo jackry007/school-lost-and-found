@@ -17,6 +17,19 @@ const CREEK_NAVY = "#0f2741"; // dark navy
 const CREEK_SOFTR = "#fef2f3"; // soft red tint
 const CREEK_SOFTN = "#f1f5fb"; // soft navy tint
 
+// ---------- Images (Supabase Storage) ----------
+const BUCKET = "item-photos";
+const FALLBACK_THUMB =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='90'>
+      <rect width='100%' height='100%' fill='#f3f4f6'/>
+      <text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle'
+            font-family='system-ui, -apple-system, Segoe UI, Roboto, sans-serif'
+            font-size='12' fill='#9ca3af'>no image</text>
+    </svg>`
+  );
+
 /* =========================================================
    Tiny Toast system (self-contained)
    ======================================================= */
@@ -176,6 +189,9 @@ export default function AdminPage() {
   // toasts
   const { add: addToast, node: toastNode } = useToasts();
 
+  // thumbnails cache: item.id -> public url
+  const [thumbMap, setThumbMap] = useState<Record<number, string>>({});
+
   /* ---------------- Auth + load ---------------- */
   const load = async () => {
     setLoading(true);
@@ -221,6 +237,25 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // build/refresh thumbnail map whenever items change
+  useEffect(() => {
+    const next: Record<number, string> = {};
+    for (const it of items) {
+      const path = (it as any).photo_url as string | null | undefined;
+      if (!path) {
+        next[it.id] = FALLBACK_THUMB;
+        continue;
+      }
+      if (/^https?:\/\//i.test(path)) {
+        next[it.id] = path;
+      } else {
+        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+        next[it.id] = data?.publicUrl || FALLBACK_THUMB;
+      }
+    }
+    setThumbMap(next);
+  }, [items]);
+
   /* ---------------- Helpers: optimistic moves ---------------- */
   function moveItemLocally(id: number, status: ItemStatusWidened) {
     setItems((prev) =>
@@ -238,7 +273,6 @@ export default function AdminPage() {
   };
 
   const updateClaim = async (id: number, status: "approved" | "rejected") => {
-    // Quick modal not necessary—low risk
     const { error } = await supabase
       .from("claims")
       .update({ status })
@@ -287,7 +321,7 @@ export default function AdminPage() {
 
     // show undo toast (5s)
     let undone = false;
-    const toastId = addToast(`Approved: “${approveTarget.title}”`, {
+    addToast(`Approved: “${approveTarget.title}”`, {
       actionLabel: "Undo (5s)",
       ttl: 5000,
       onAction: async () => {
@@ -309,17 +343,11 @@ export default function AdminPage() {
       return;
     }
 
-    // if no undo after 5s, nothing to do
-    setTimeout(() => {
-      if (!undone) {
-        // could log audit here
-      }
-    }, 5200);
+    // if no undo after 5s, nothing else to do
   };
 
-  // Reject (simple modal inline)
+  // Reject
   const updateItemStatus = async (id: number, status: "rejected") => {
-    // quick confirm with a light modal could be added; keeping simple
     const { error } = await supabase
       .from("items")
       .update({ status })
@@ -360,7 +388,6 @@ export default function AdminPage() {
     setEditOpen(false);
     setEditItem(null);
     setEditForm({});
-    // local patch instead of full reload:
     setItems((prev) =>
       prev.map((it) =>
         it.id === editItem.id ? ({ ...it, ...payload } as Item) : it
@@ -558,12 +585,15 @@ export default function AdminPage() {
             {pendingItems.length === 0 && <EmptyRow text="No pending items." />}
             {pendingItems.map((it) => (
               <Row key={it.id}>
-                <RowInfo
-                  title={`#${it.id} · ${it.title}`}
-                  meta={`${it.category ?? "—"} · ${
-                    (it as any).location ?? "—"
-                  } · submitted ${new Date(it.created_at).toLocaleString()}`}
-                />
+                <div className="flex items-center">
+                  <Thumb src={thumbMap[it.id]} alt={it.title} />
+                  <RowInfo
+                    title={`#${it.id} · ${it.title}`}
+                    meta={`${it.category ?? "—"} · ${
+                      (it as any).location ?? "—"
+                    } · submitted ${new Date(it.created_at).toLocaleString()}`}
+                  />
+                </div>
                 <RowActions>
                   <Btn tone="primary" onClick={() => askApprove(it)}>
                     Approve &amp; List
@@ -660,15 +690,18 @@ export default function AdminPage() {
               const s = it.status as ItemStatusWidened;
               return (
                 <Row key={it.id}>
-                  <RowInfo
-                    title={`#${it.id} · ${it.title}`}
-                    meta={
-                      <>
-                        <StatusBadge status={s} /> · {it.category ?? "—"} ·{" "}
-                        {(it as any).location ?? "—"}
-                      </>
-                    }
-                  />
+                  <div className="flex items-center">
+                    <Thumb src={thumbMap[it.id]} alt={it.title} />
+                    <RowInfo
+                      title={`#${it.id} · ${it.title}`}
+                      meta={
+                        <>
+                          <StatusBadge status={s} /> · {it.category ?? "—"} ·{" "}
+                          {(it as any).location ?? "—"}
+                        </>
+                      }
+                    />
+                  </div>
                   <RowActions>
                     {s === "pending" && (
                       <>
@@ -802,7 +835,7 @@ export default function AdminPage() {
         {approveTarget ? (
           <p>
             Set <strong>#{approveTarget.id}</strong> — “{approveTarget.title}”
-            to <strong>listed</strong>? It will appear publicly in Search and
+            to <strong>listed</strong>? It will appear publicly in Search and on
             the home page.
           </p>
         ) : null}
@@ -1085,5 +1118,20 @@ function Labeled({
       <span className="text-gray-700">{label}</span>
       {children}
     </label>
+  );
+}
+
+// ---------- Tiny thumb component ----------
+function Thumb({ src, alt }: { src?: string; alt?: string }) {
+  return (
+    <div className="mr-3 h-12 w-16 overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src || FALLBACK_THUMB}
+        alt={alt || ""}
+        className="h-full w-full object-cover"
+        loading="lazy"
+      />
+    </div>
   );
 }
