@@ -4,9 +4,9 @@ import * as React from "react";
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 
-// ─────────────────────────────
-// Type
-// ─────────────────────────────
+/* ─────────────────────────────
+   Type
+   ───────────────────────────── */
 export type Item = {
   id: string;
   title: string;
@@ -14,12 +14,12 @@ export type Item = {
   category: string;
   date: string; // ISO yyyy-mm-dd
   thumb?: string | null;
-  description?: string | null;
+  note?: string | null;
 };
 
-// ─────────────────────────────
-// ItemCard Component
-// ─────────────────────────────
+/* ─────────────────────────────
+   ItemCard Component
+   ───────────────────────────── */
 export function ItemCard({ item }: { item: Item }) {
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
@@ -80,11 +80,14 @@ export function ItemCard({ item }: { item: Item }) {
         </div>
       </article>
 
-      {/* ──────────────── Modal (Zoomed View) */}
+      {/* ──────────────── Modal (Quick View) */}
       {mounted &&
         open &&
         createPortal(
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${item.title} details`}
             className="fixed inset-0 z-50 flex items-center justify-center"
             onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}
           >
@@ -92,20 +95,22 @@ export function ItemCard({ item }: { item: Item }) {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
             {/* Dialog */}
-            <div className="relative z-10 grid w-[min(90vw,900px)] max-h-[90vh] grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-950 md:grid-cols-2">
-              {/* Left: Image */}
-              <div className="relative group overflow-hidden bg-gray-100 dark:bg-gray-900">
+            <div className="relative z-10 grid w-[min(92vw,1000px)] h-[min(90vh,900px)] grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-950 md:grid-cols-2">
+              {/* Left: Image (contained, never overflows) */}
+              <div className="relative flex items-center justify-center bg-gray-100 dark:bg-gray-900">
                 {item.thumb ? (
                   <img
                     src={item.thumb}
                     alt={item.title}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="max-h-full max-w-full object-contain"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-gray-500">
                     No image
                   </div>
                 )}
+
+                {/* Close */}
                 <button
                   ref={closeRef}
                   onClick={() => setOpen(false)}
@@ -116,9 +121,9 @@ export function ItemCard({ item }: { item: Item }) {
                 </button>
               </div>
 
-              {/* Right: Info */}
-              <div className="flex flex-col gap-4 p-5 md:p-6 overflow-y-auto">
-                <div>
+              {/* Right: Info (scrollable) */}
+              <div className="flex min-h-0 flex-col overflow-auto">
+                <div className="p-5 md:p-6">
                   <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
                     {item.title}
                   </h2>
@@ -128,22 +133,25 @@ export function ItemCard({ item }: { item: Item }) {
                   <p className="text-xs text-gray-500">
                     Found {new Date(item.date).toLocaleDateString()}
                   </p>
+
+                  <div className="prose mt-4 max-w-none prose-p:my-3 dark:prose-invert">
+                    <h3 className="mb-1 text-base font-medium">Description</h3>
+                    <p className="text-sm leading-6">
+                      {item.note?.trim() || "No description provided."}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="prose max-w-none prose-p:my-3 dark:prose-invert">
-                  <h3 className="mb-1 text-base font-medium">Description</h3>
-                  <p className="text-sm leading-6">
-                    {item.description?.trim() || "No description provided."}
-                  </p>
-                </div>
-
-                <div className="mt-auto">
-                  <button
-                    onClick={() => alert("Claim flow here")}
-                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  >
-                    Start claim
-                  </button>
+                {/* Sticky action bar — claim button always visible */}
+                <div className="sticky bottom-0 z-10 border-t bg-white/85 p-4 backdrop-blur dark:bg-gray-950/85">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href={`/claim?item=${item.id}`}
+                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                      Start claim
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
