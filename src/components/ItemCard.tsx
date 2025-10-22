@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 
 export type ItemCardData = {
@@ -16,7 +14,13 @@ export type ItemCardData = {
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
 
+// Base path for GH Pages ("" in dev, "/school-lost-and-found" in prod)
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export function ItemCard({ item }: { item: ItemCardData }) {
+  const itemHref = `${BASE}/item/?id=${encodeURIComponent(item.id)}`;
+  const claimHref = `${BASE}/claim?item=${encodeURIComponent(item.id)}`;
+
   return (
     <article
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg dark:border-gray-800 dark:bg-gray-950"
@@ -24,7 +28,7 @@ export function ItemCard({ item }: { item: ItemCardData }) {
     >
       {/* Thumbnail */}
       <a
-        href={`/items/${item.id}`}
+        href={itemHref}
         className="relative block aspect-[4/3] overflow-hidden bg-neutral-100 dark:bg-neutral-900"
       >
         {item.thumb ? (
@@ -52,7 +56,7 @@ export function ItemCard({ item }: { item: ItemCardData }) {
       {/* Card content */}
       <div className="flex flex-col gap-2 p-4">
         <a
-          href={`/items/${item.id}`}
+          href={itemHref}
           className="line-clamp-1 font-semibold leading-tight text-gray-900 hover:text-[var(--creek-red)] dark:text-gray-100"
           style={{ "--creek-red": CREEK_RED } as React.CSSProperties}
         >
@@ -70,11 +74,9 @@ export function ItemCard({ item }: { item: ItemCardData }) {
         {/* CTAs */}
         <div className="mt-2 flex gap-2">
           <a
-            href={`/claim?item=${item.id}`}
+            href={claimHref}
             className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
-            style={{
-              backgroundColor: CREEK_RED,
-            }}
+            style={{ backgroundColor: CREEK_RED }}
             onMouseEnter={(e) =>
               ((e.currentTarget as HTMLElement).style.backgroundColor =
                 "#A81828")
@@ -87,7 +89,7 @@ export function ItemCard({ item }: { item: ItemCardData }) {
             Start claim
           </a>
           <a
-            href={`/items/${item.id}`}
+            href={itemHref}
             className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-[var(--creek-navy)] transition-colors hover:bg-[var(--creek-navy)] hover:text-white dark:border-gray-700"
             style={{ "--creek-navy": CREEK_NAVY } as React.CSSProperties}
           >
