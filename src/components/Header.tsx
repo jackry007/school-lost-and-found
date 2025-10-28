@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
+
+// Persist when the banner may show again
+const NOTICE_NEXT_SHOW_KEY = "cc-lostfound-notice:nextShowAt:v1";
+const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
 const nav = [
   { href: "/", label: "Lost & Found" },
@@ -14,15 +18,30 @@ const nav = [
   { href: "/admin", label: "Admin" },
 ];
 
+function shouldShowNoticeNow(): boolean {
+  if (typeof window === "undefined") return false; // don't render on server to avoid mismatch
+  const raw = window.localStorage.getItem(NOTICE_NEXT_SHOW_KEY);
+  if (!raw) return true; // never dismissed -> show
+  const nextShowAt = parseInt(raw, 10) || 0;
+  return Date.now() >= nextShowAt; // show only if we're past the next-show time
+}
+
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  // null = not decided yet; avoids initial flash
+  const [showNotice, setShowNotice] = useState<null | boolean>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 6);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Decide visibility on mount (client-only) to prevent flicker
+  useEffect(() => {
+    setShowNotice(shouldShowNoticeNow());
   }, []);
 
   return (
@@ -51,15 +70,12 @@ export function Header() {
         >
           {/* Left: Brand + Nav */}
           <div className="flex items-center gap-7">
-            {/* Brand lockup */}
             <Link
               href="/"
               className="group flex items-center gap-3 rounded-lg px-2 py-1 transition no-underline decoration-0"
               style={{ textDecoration: "none" }}
               aria-label="Cherry Creek Lost & Found Home"
             >
-              {/* Swap emoji for crest image if you have it */}
-              {/* <img src="/images/cherry-creek-logo.png" alt="" className="h-8 w-8 rounded-md" /> */}
               <span className="text-2xl leading-none">🎒</span>
               <div className="leading-tight">
                 <div className="text-[16px] font-extrabold tracking-tight">
@@ -71,7 +87,6 @@ export function Header() {
               </div>
             </Link>
 
-            {/* Nav (pill + underline only on hover/active) */}
             <nav className="hidden md:flex items-center gap-1.5">
               {nav.map((n) => {
                 const active = pathname === n.href;
@@ -89,7 +104,6 @@ export function Header() {
                     style={{ textDecoration: "none" }}
                   >
                     {n.label}
-                    {/* centered thicker underline */}
                     <span
                       className={[
                         "pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1 h-[3px] w-10 rounded-full transition-all",
@@ -144,12 +158,48 @@ export function Header() {
             "repeating-linear-gradient(135deg, #BF1E2E 0 16px, #0B2C5C 16px 32px)",
         }}
       />
-      {/* ⚠️ Disclaimer */}
-      <div className="bg-yellow-50 border-y border-yellow-200 text-center text-sm sm:text-base text-yellow-900 py-2 px-4 shadow-sm">
-        ⚠️ <span className="font-semibold">Important Notice:</span> Items
-        unclaimed after <strong>60 days</strong> may be donated or disposed of
-        according to school policy.
-      </div>
+
+      {/* ⚠️ Dismissible Notice — no flash, reappears after 1 day */}
+      {showNotice === true && (
+        <div
+          role="region"
+          aria-label="Important notice"
+          className={[
+            "relative bg-yellow-50 border-y border-yellow-200",
+            "text-center text-sm sm:text-base text-yellow-900",
+            "py-2 pl-4 pr-12 shadow-sm",
+            "transition-opacity duration-300 ease-out",
+          ].join(" ")}
+        >
+          ⚠️ <span className="font-semibold">Important Notice:</span> Items
+          unclaimed after <strong>60 days</strong> may be donated or disposed of
+          according to school policy.
+          <button
+            type="button"
+            aria-label="Dismiss important notice"
+            onClick={() => {
+              setShowNotice(false);
+              try {
+                window.localStorage.setItem(
+                  NOTICE_NEXT_SHOW_KEY,
+                  String(Date.now() + ONE_DAY_MS)
+                );
+              } catch {}
+            }}
+            className={[
+              "absolute right-2 top-1/2 -translate-y-1/2",
+              "inline-flex items-center justify-center",
+              "rounded-md p-2",
+              "text-yellow-900/80 hover:text-yellow-900",
+              "hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60",
+              "transition",
+            ].join(" ")}
+            title="Dismiss"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </>
   );
 }
