@@ -36,9 +36,11 @@ type ItemRow = {
 
 type ClaimInsert = {
   item_id: number | string;
-  message: string;
-  proof_answers_json: Record<string, string>;
-  availability: string; // we store the human summary the picker emits
+  claimant_name: string;
+  claimant_email: string;
+  notes: string; // message to admin
+  proof: string | null; // combined proof fields
+  // status omitted; DB defaults to 'pending'
 };
 
 /* ========= Data helpers ========= */
@@ -62,12 +64,12 @@ async function createClaim(payload: ClaimInsert) {
       apikey: SB_KEY,
       Authorization: `Bearer ${SB_KEY}`,
       "content-type": "application/json",
-      Prefer: "return=representation",
+      Prefer: "return=representation", // return inserted row
     },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error((await res.text()) || "Failed to submit claim.");
-  return (await res.json()) as Array<{ id: string }>;
+  return (await res.json()) as Array<{ id: number | string }>;
 }
 
 /* ========= Small UI helpers ========= */
@@ -86,9 +88,13 @@ const Label = (
     )}
   </label>
 );
-const Help = ({ children }: { children: React.ReactNode }) => (
-  <p className="mt-1 text-xs text-gray-500">{children}</p>
+
+const Help = ({ id, children }: { id?: string; children: React.ReactNode }) => (
+  <p id={id} className="mt-1 text-xs text-gray-500">
+    {children}
+  </p>
 );
+
 const StatusPill = ({ children }: { children: React.ReactNode }) => (
   <span
     className="rounded-full px-2 py-0.5 text-xs font-medium"
@@ -97,132 +103,6 @@ const StatusPill = ({ children }: { children: React.ReactNode }) => (
     {children}
   </span>
 );
-
-/* ========= Periods-only Availability Picker ========= */
-// Days: Mon–Fri, Slots: Before, P1–P8, After (to 4:30 pm)
-function cx(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
-
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
-const SLOTS = [
-  { id: "before", label: "Before School" },
-  { id: "P1", label: "P1" },
-  { id: "P2", label: "P2" },
-  { id: "P3", label: "P3" },
-  { id: "P4", label: "P4" },
-  { id: "P5", label: "P5" },
-  { id: "P6", label: "P6" },
-  { id: "P7", label: "P7" },
-  { id: "P8", label: "P8" },
-  { id: "after", label: "After School (to 4:30 pm)" },
-] as const;
-
-function PickupAvailability({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [days, setDays] = useState<string[]>([]);
-  const [slots, setSlots] = useState<string[]>([]);
-
-  // Best-effort parse of an incoming summary string
-  useEffect(() => {
-    if (!value) return;
-    const [dStr, sStr] = value.split("•").map((s) => s.trim());
-    if (dStr) {
-      const ds = dStr.split(",").map((s) => s.trim());
-      setDays(DAYS.filter((d) => ds.includes(d)));
-    }
-    if (sStr) {
-      const labels = sStr.split(",").map((s) => s.trim());
-      const ids = SLOTS.filter((s) =>
-        labels.some((l) => l.startsWith(s.label))
-      ).map((s) => s.id);
-      setSlots(ids);
-    }
-  }, [value]);
-
-  // Emit compact human-readable summary
-  useEffect(() => {
-    if (!days.length || !slots.length) onChange("");
-    else {
-      const slotLabels = slots
-        .map((id) => SLOTS.find((s) => s.id === id)!.label)
-        .join(",");
-      onChange(`${days.join(",")} • ${slotLabels}`);
-    }
-  }, [days, slots, onChange]);
-
-  const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) => {
-    setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
-  };
-
-  return (
-    <div className="space-y-3">
-      {/* Days */}
-      <div className="flex flex-wrap gap-2">
-        {DAYS.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => toggle(days, setDays, d)}
-            className={cx(
-              "rounded-xl border px-3 py-1.5 text-sm",
-              days.includes(d)
-                ? "border-[#0B2C5C] bg-[#0B2C5C] text-white"
-                : "border-gray-300 hover:bg-gray-50"
-            )}
-            aria-pressed={days.includes(d)}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
-
-      {/* Periods */}
-      <div className="flex flex-wrap gap-2">
-        {SLOTS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => toggle(slots, setSlots, s.id)}
-            className={cx(
-              "rounded-xl border px-3 py-1.5 text-sm",
-              slots.includes(s.id)
-                ? "border-[#BF1E2E] bg-[#BF1E2E] text-white"
-                : "border-gray-300 hover:bg-gray-50"
-            )}
-            aria-pressed={slots.includes(s.id)}
-            title={
-              s.id === "after" ? "Student available until 4:30 pm" : undefined
-            }
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Summary */}
-      <p className="text-xs text-gray-600">
-        {days.length && slots.length ? (
-          <>
-            Selected: <span className="font-medium">{days.join(",")}</span> •{" "}
-            <span className="font-medium">
-              {slots
-                .map((id) => SLOTS.find((s) => s.id === id)!.label)
-                .join(", ")}
-            </span>
-          </>
-        ) : (
-          "Pick at least one day and one period."
-        )}
-      </p>
-    </div>
-  );
-}
 
 /* ========= Page ========= */
 export default function ClaimPage() {
@@ -234,18 +114,25 @@ export default function ClaimPage() {
   const [err, setErr] = useState<string | null>(null);
 
   // form state
+  const [claimantName, setClaimantName] = useState("");
+  const [claimantEmail, setClaimantEmail] = useState("");
   const [message, setMessage] = useState("");
   const [q1, setQ1] = useState("");
   const [q2, setQ2] = useState("");
-  const [availability, setAvailability] = useState(""); // picker writes here
   const [submitting, setSubmitting] = useState(false);
-  const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [submittedId, setSubmittedId] = useState<number | string | null>(null);
+  const [msgFocused, setMsgFocused] = useState(false);
+  const [honeypot, setHoneypot] = useState(""); // spam trap
 
   // validation
-  const vMessage = message.trim().length >= 20;
-  const vQ1 = q1.trim().length >= 4;
-  const vAvail = availability.trim().length >= 4; // picker returns "" until valid
-  const isValid = !!itemId && vMessage && vQ1 && vAvail;
+  const vName = claimantName.trim().length > 1;
+  const vEmail = /\S+@\S+\.\S+/.test(claimantEmail.trim());
+  const vMessage = message.trim().length >= 20; // detailed message encouraged
+  const vAnyProof = q1.trim().length > 0 || q2.trim().length > 0;
+
+  // final validity: must have name + email AND (message OR any proof)
+  const isValid =
+    !!itemId && vName && vEmail && (vMessage || vAnyProof) && !honeypot;
 
   // load item
   useEffect(() => {
@@ -278,23 +165,32 @@ export default function ClaimPage() {
     setSubmitting(true);
     setErr(null);
     setSubmittedId(null);
+
     try {
+      const proofCombined =
+        [q1.trim(), q2.trim()].filter(Boolean).join(" | ") || null;
+
       const created = await createClaim({
         item_id: item.id,
-        message: message.trim(),
-        availability: availability.trim(),
-        proof_answers_json: {
-          proof_1: q1.trim(),
-          ...(q2.trim() ? { proof_2: q2.trim() } : {}),
-        },
+        claimant_name: claimantName.trim(),
+        claimant_email: claimantEmail.trim(),
+        notes: message.trim(), // store message in `notes`
+        proof: proofCombined, // optional
       });
-      setSubmittedId(created?.[0]?.id ?? "ok");
+
+      const inserted = created?.[0];
+      setSubmittedId(inserted?.id ?? null);
+
+      // clear form (keep email in success card)
+      setClaimantName("");
+      // keep claimantEmail to show in success message
       setMessage("");
       setQ1("");
       setQ2("");
-      setAvailability("");
     } catch (e: any) {
       setErr(e?.message || "Failed to submit claim.");
+      // focus error box for a11y
+      setTimeout(() => document.getElementById("error-box")?.focus(), 0);
     } finally {
       setSubmitting(false);
     }
@@ -356,6 +252,15 @@ export default function ClaimPage() {
           )}
         </header>
 
+        {/* aria-live region for a11y */}
+        <div aria-live="polite" className="sr-only">
+          {err
+            ? `Error: ${err}`
+            : submittedId
+            ? `Success. Reference ${String(submittedId)}`
+            : ""}
+        </div>
+
         {/* Errors / loading */}
         {!itemId && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
@@ -375,7 +280,11 @@ export default function ClaimPage() {
           </div>
         )}
         {itemId && err && !loading && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+          <div
+            id="error-box"
+            tabIndex={-1}
+            className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 focus:outline-none"
+          >
             {err}
           </div>
         )}
@@ -420,109 +329,150 @@ export default function ClaimPage() {
               noValidate
               className="mt-6 rounded-2xl border bg-white p-5 shadow-sm"
             >
-              <p className="mb-5 text-sm text-gray-600">
-                Answer the proof questions and share your pickup availability.
-                Don’t include personal info beyond what’s requested.
+              {/* Honeypot (hidden) */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                className="hidden"
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+
+              <p className="mb-5 text-sm text-gray-600" id="form-guide">
+                Provide <span className="font-medium">either</span> a detailed
+                message <span className="font-medium">or</span> one proof
+                detail. Please don’t include sensitive personal info.
               </p>
 
               <div className="grid gap-5 md:grid-cols-2">
-                {/* Message (full width) */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="message" required>
-                    Message to Admin
+                {/* Name */}
+                <div>
+                  <Label htmlFor="name" required>
+                    Full Name
                   </Label>
+                  <input
+                    id="name"
+                    autoComplete="name"
+                    value={claimantName}
+                    onChange={(e) => setClaimantName(e.target.value)}
+                    required
+                    aria-invalid={!vName}
+                    aria-describedby="form-guide"
+                    className="mt-1 w-full rounded-xl border p-2.5 text-sm outline-none transition focus:ring-2"
+                    style={{
+                      borderColor: vName ? "#e5e7eb" : "#fecaca",
+                      boxShadow: vName ? undefined : "0 0 0 2px #fee2e2 inset",
+                    }}
+                    placeholder="e.g., John Smith"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <Label htmlFor="email" required>
+                    Contact Email
+                  </Label>
+                  <input
+                    id="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={claimantEmail}
+                    onChange={(e) => setClaimantEmail(e.target.value)}
+                    required
+                    aria-invalid={!vEmail}
+                    aria-describedby="form-guide email-help"
+                    className="mt-1 w-full rounded-xl border p-2.5 text-sm outline-none transition focus:ring-2"
+                    style={{
+                      borderColor: vEmail ? "#e5e7eb" : "#fecaca",
+                      boxShadow: vEmail ? undefined : "0 0 0 2px #fee2e2 inset",
+                    }}
+                    placeholder="johnsmith@cherrycreekschools.org"
+                  />
+                  <Help id="email-help">
+                    We’ll contact you about this claim at this address.
+                  </Help>
+                </div>
+
+                {/* Message (optional, full width) */}
+                <div className="md:col-span-2">
+                  <Label htmlFor="message">Message (optional)</Label>
                   <textarea
                     id="message"
-                    rows={5}
+                    rows={6}
+                    maxLength={1000}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    required
-                    minLength={20}
-                    aria-invalid={!vMessage}
-                    aria-describedby="message-help message-count"
-                    className={`mt-1 w-full rounded-xl border p-3 text-sm outline-none transition focus:ring-2`}
+                    onFocus={() => setMsgFocused(true)}
+                    onBlur={() => setMsgFocused(false)}
+                    aria-invalid={!vMessage && !vAnyProof}
+                    aria-describedby="form-guide msg-help message-count"
+                    className="mt-1 w-full rounded-xl border p-3 text-sm outline-none transition focus:ring-2"
                     style={{
-                      borderColor: vMessage ? "#e5e7eb" : "#fecaca",
-                      boxShadow: vMessage
-                        ? undefined
-                        : "0 0 0 2px #fee2e2 inset",
+                      borderColor:
+                        vMessage || vAnyProof ? "#e5e7eb" : "#fecaca",
+                      boxShadow:
+                        vMessage || vAnyProof
+                          ? undefined
+                          : "0 0 0 2px #fee2e2 inset",
                     }}
-                    placeholder="Describe the item and why you believe it's yours."
+                    placeholder={`Helpful details:
+• Where you think you left it (room/hallway/cafeteria)
+• When you last saw it
+• Description (color/brand/case/unique marks)
+• Anything only you would know (engraving, last 4, stickers)`}
                   />
                   <div className="mt-1 flex items-center justify-between">
-                    <Help>Minimum 20 characters.</Help>
-                    <span
-                      id="message-count"
-                      className={`text-xs ${
-                        vMessage ? "text-gray-500" : "text-red-600"
-                      }`}
-                    >
-                      {message.trim().length}/20
-                    </span>
+                    <Help id="msg-help">
+                      Give a detailed message or at least one proof below.
+                    </Help>
+                    {msgFocused && (
+                      <span
+                        id="message-count"
+                        className={`text-xs ${
+                          vMessage ? "text-gray-500" : "text-red-600"
+                        }`}
+                      >
+                        {message.trim().length}/20
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Proof #1 */}
+                {/* Proof #1 (optional) */}
                 <div>
-                  <Label htmlFor="q1" required>
-                    Proof detail #1{" "}
+                  <Label htmlFor="q1">
+                    Proof detail #1 (optional){" "}
                     <span className="font-normal text-gray-500">
-                      (engraving, sticker, last 4 digits, unique mark)
+                      — try brand, case color, last 4 digits, engraving
                     </span>
                   </Label>
                   <input
                     id="q1"
                     value={q1}
                     onChange={(e) => setQ1(e.target.value)}
-                    required
-                    aria-invalid={!vQ1}
-                    className="mt-1 w-full rounded-xl border p-2.5 text-sm outline-none transition focus:ring-2"
-                    style={{
-                      borderColor: vQ1 ? "#e5e7eb" : "#fecaca",
-                      boxShadow: vQ1 ? undefined : "0 0 0 2px #fee2e2 inset",
-                    }}
-                    placeholder="e.g., 'Last 4 digits on the case: 1420'"
+                    spellCheck={false}
+                    aria-describedby="form-guide proof1-help"
+                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm outline-none transition focus:ring-2 focus:ring-[rgba(11,44,92,.25)]"
+                    placeholder="e.g., Last 4 digits on the case: 1420"
                   />
-                  <Help>Required.</Help>
+                  <Help id="proof1-help">
+                    Only share details someone else wouldn’t know.
+                  </Help>
                 </div>
 
-                {/* Proof #2 */}
+                {/* Proof #2 (optional) */}
                 <div>
                   <Label htmlFor="q2">Proof detail #2 (optional)</Label>
                   <input
                     id="q2"
                     value={q2}
                     onChange={(e) => setQ2(e.target.value)}
+                    spellCheck={false}
                     className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm outline-none transition focus:ring-2 focus:ring-[rgba(11,44,92,.25)]"
                     placeholder="Anything else that proves it's yours"
                   />
-                </div>
-
-                {/* Availability (full width) */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="avail" required>
-                    Preferred Pickup Times
-                  </Label>
-                  {/* hidden input for semantics */}
-                  <input
-                    id="avail"
-                    type="hidden"
-                    value={availability}
-                    readOnly
-                  />
-                  <PickupAvailability
-                    value={availability}
-                    onChange={setAvailability}
-                  />
-                  <Help>
-                    Choose days and periods. “After School” means available
-                    until 4:30 pm.
-                  </Help>
-                  {!vAvail && (
-                    <p className="mt-1 text-xs font-medium text-red-600">
-                      Please select at least one day and one period.
-                    </p>
-                  )}
                 </div>
               </div>
 
@@ -551,8 +501,25 @@ export default function ClaimPage() {
                   className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800"
                   role="status"
                 >
-                  ✅ Claim received! We’ll email you after review. Reference:{" "}
-                  <span className="font-mono">{submittedId}</span>
+                  ✅ Claim received! We’ll review and contact you at{" "}
+                  <b>{claimantEmail || "your email"}</b>.
+                  <br />
+                  Reference ID:{" "}
+                  <code className="font-mono">{String(submittedId)}</code>
+                  <button
+                    type="button"
+                    className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs"
+                    onClick={() =>
+                      navigator.clipboard.writeText(String(submittedId))
+                    }
+                    aria-label="Copy reference ID"
+                  >
+                    Copy
+                  </button>
+                  <div className="mt-1 text-gray-700">
+                    Pick up at the Front Office during school hours. Bring your
+                    student ID.
+                  </div>
                 </div>
               )}
             </form>
@@ -570,6 +537,9 @@ export default function ClaimPage() {
                   disabled={!isValid || submitting}
                   className="w-full rounded-xl bg-[#BF1E2E] px-4 py-3 text-center text-sm font-semibold text-white disabled:opacity-60"
                 >
+                  {submitting && (
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-b-transparent" />
+                  )}
                   {submitting ? "Submitting…" : "Submit Claim"}
                 </button>
               </div>
