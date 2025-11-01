@@ -4,6 +4,9 @@
 
 /* ===== Theme tokens ===== */
 :root {
+  /* Force light mode only */
+  color-scheme: light;
+
   /* Cherry Creek color scheme */
   --background: #f8fafc; /* very light gray/white background */
   --foreground: #111827; /* dark navy text */
@@ -13,14 +16,8 @@
   --border-color: #e5e7eb;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #f3f4f6;
-    --card-bg: #1f2937;
-    --border-color: #374151;
-  }
-}
+/* NOTE: Dark mode completely disabled.
+   The prefers-color-scheme media query has been removed. */
 
 /* ===== Base resets ===== */
 *,
@@ -74,6 +71,7 @@ a {
   padding: 0.6rem 0.8rem;
   font: inherit;
 }
+
 .textarea {
   min-height: 120px;
   resize: vertical;
@@ -99,13 +97,16 @@ a {
   color: #fff;
   font-weight: 500;
 }
+
 .btn:hover {
   filter: brightness(1.05);
 }
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .btn-outline {
   background: transparent;
   color: var(--foreground);
