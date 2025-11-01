@@ -1,19 +1,26 @@
 "use client";
 
+/**
+ * Claim page
+ * - Identity comes from Supabase session (no name/email inputs)
+ * - Message & proof fields are OPTIONAL
+ * - After submit: show success screen and auto-redirect back to the search page in 5 s
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 /* ========= Brand / env ========= */
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const BUCKET = "item-photos";
 
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
 
-/* same fallback/helper as Item page */
+/* ========= Helpers ========= */
 const FALLBACK_IMG = `${BASE}/no-image.png`;
 function publicUrlFromPath(path?: string | null) {
   if (!path) return FALLBACK_IMG;
@@ -37,42 +44,42 @@ type ItemRow = {
 type ClaimInsert = {
   item_id: number | string;
   claimant_name: string;
-  claimant_email: string;
-  notes: string; // message to admin
-  proof: string | null; // combined proof fields
-  // status omitted; DB defaults to 'pending'
+  claimant_email: string | null;
+  notes: string;
+  proof: string | null;
 };
+
+type AuthState = "unknown" | "authed" | "guest";
 
 /* ========= Data helpers ========= */
 async function fetchItemById(id: string): Promise<ItemRow | null> {
-  const url = `${SB_URL}/rest/v1/items?id=eq.${encodeURIComponent(
-    id
-  )}&select=*`;
-  const res = await fetch(url, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  const rows = (await res.json()) as ItemRow[];
-  return rows?.[0] ?? null;
+  const { data, error } = await supabase
+    .from("items")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return null;
+  return data ?? null;
 }
 
 async function createClaim(payload: ClaimInsert) {
-  const res = await fetch(`${SB_URL}/rest/v1/claims`, {
-    method: "POST",
-    headers: {
-      apikey: SB_KEY,
-      Authorization: `Bearer ${SB_KEY}`,
-      "content-type": "application/json",
-      Prefer: "return=representation", // return inserted row
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error((await res.text()) || "Failed to submit claim.");
-  return (await res.json()) as Array<{ id: number | string }>;
+  const {
+    data: { user },
+    error: uErr,
+  } = await supabase.auth.getUser();
+  if (uErr || !user) throw new Error("Please sign in first.");
+
+  const { data, error } = await supabase
+    .from("claims")
+    .insert([{ ...payload, claimant_uid: user.id }])
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return [{ id: data!.id as number | string }];
 }
 
-/* ========= Small UI helpers ========= */
+/* ========= Small UI bits ========= */
 const Label = (
   p: React.LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean }
 ) => (
@@ -80,12 +87,7 @@ const Label = (
     {...p}
     className={`block text-sm font-medium text-gray-900 ${p.className || ""}`}
   >
-    {p.children}{" "}
-    {p.required && (
-      <span className="text-red-500" title="Required">
-        *
-      </span>
-    )}
+    {p.children} {p.required && <span className="text-red-500">*</span>}
   </label>
 );
 
@@ -104,6 +106,33 @@ const StatusPill = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
+/** Login prompt that can open your header auth panel via a custom event */
+function LoginPrompt({ backHref }: { backHref: string }) {
+  function openHeaderLogin() {
+    document.dispatchEvent(new Event("cc-auth:open"));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  return (
+    <section className="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-gray-900">Please sign in</h2>
+      <p className="mt-2 text-sm text-gray-600">
+        Sign in with your school account to submit a claim.
+      </p>
+      <div className="mt-4 flex gap-3">
+        <button type="button" onClick={openHeaderLogin} className="btn">
+          Sign in (opens panel)
+        </button>
+        <Link
+          href={backHref}
+          className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        >
+          Back
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 /* ========= Page ========= */
 export default function ClaimPage() {
   const sp = useSearchParams();
@@ -113,28 +142,89 @@ export default function ClaimPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // form state
-  const [claimantName, setClaimantName] = useState("");
-  const [claimantEmail, setClaimantEmail] = useState("");
+  const [auth, setAuth] = useState<AuthState>("unknown");
+
+  // Identity (read from session)
+  const [claimantName, setClaimantName] = useState("Student");
+  const [claimantEmail, setClaimantEmail] = useState<string>("");
+
+  // Form state
   const [message, setMessage] = useState("");
   const [q1, setQ1] = useState("");
   const [q2, setQ2] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submittedId, setSubmittedId] = useState<number | string | null>(null);
-  const [msgFocused, setMsgFocused] = useState(false);
-  const [honeypot, setHoneypot] = useState(""); // spam trap
+  const [honeypot, setHoneypot] = useState("");
 
-  // validation
-  const vName = claimantName.trim().length > 1;
-  const vEmail = /\S+@\S+\.\S+/.test(claimantEmail.trim());
-  const vMessage = message.trim().length >= 20; // detailed message encouraged
-  const vAnyProof = q1.trim().length > 0 || q2.trim().length > 0;
+  /* ===== Boolean guards ===== */
+  const isGuest: boolean = auth === "guest";
+  const isAuthed: boolean = auth === "authed";
+  const canShowForm: boolean = !submittedId && (isAuthed || auth === "unknown");
 
-  // final validity: must have name + email AND (message OR any proof)
-  const isValid =
-    !!itemId && vName && vEmail && (vMessage || vAnyProof) && !honeypot;
+  // Fully optional message/proof; only require identity + itemId + no honeypot
+  const isValid = !!itemId && isAuthed && !honeypot;
 
-  // load item
+  /* ===== Load identity ===== */
+  useEffect(() => {
+    async function loadIdentity() {
+      const [{ data: sess }, { data: usr }] = await Promise.all([
+        supabase.auth.getSession(),
+        supabase.auth.getUser(),
+      ]);
+
+      const session = sess.session ?? null;
+      const user = usr.user ?? session?.user ?? null;
+
+      setAuth(session ? "authed" : "guest");
+
+      if (user) {
+        setClaimantEmail(user.email ?? "");
+        setClaimantName(
+          (user.user_metadata?.full_name as string) ||
+            user.email?.split("@")[0] ||
+            "Student"
+        );
+      } else {
+        setClaimantEmail("");
+        setClaimantName("Student");
+      }
+    }
+
+    loadIdentity();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      const authed = !!s;
+      setAuth(authed ? "authed" : "guest");
+      const u = s?.user ?? null;
+      setClaimantEmail(u?.email ?? "");
+      setClaimantName(
+        (u?.user_metadata?.full_name as string) ||
+          (u?.email?.split("@")[0] ?? "Student")
+      );
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // If guest, optionally open auth panel
+  useEffect(() => {
+    if (isGuest) {
+      document.dispatchEvent(new Event("cc-auth:open"));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [isGuest]);
+
+  // Optional: /claim?item=18&login=1 → open panel
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const u = new URL(window.location.href);
+    if (u.searchParams.get("login") === "1") {
+      document.dispatchEvent(new Event("cc-auth:open"));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, []);
+
+  /* ===== Load item ===== */
   useEffect(() => {
     if (!itemId) {
       setErr("Missing item id.");
@@ -158,9 +248,10 @@ export default function ClaimPage() {
     };
   }, [itemId]);
 
+  /* ===== Submit ===== */
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValid || !item) return;
+    if (!isValid || !item || isGuest) return;
 
     setSubmitting(true);
     setErr(null);
@@ -173,33 +264,40 @@ export default function ClaimPage() {
       const created = await createClaim({
         item_id: item.id,
         claimant_name: claimantName.trim(),
-        claimant_email: claimantEmail.trim(),
-        notes: message.trim(), // store message in `notes`
-        proof: proofCombined, // optional
+        claimant_email: (claimantEmail || "").trim() || null,
+        notes: message.trim(),
+        proof: proofCombined,
       });
 
       const inserted = created?.[0];
       setSubmittedId(inserted?.id ?? null);
 
-      // clear form (keep email in success card)
-      setClaimantName("");
-      // keep claimantEmail to show in success message
+      // Clear non-identity fields
       setMessage("");
       setQ1("");
       setQ2("");
     } catch (e: any) {
       setErr(e?.message || "Failed to submit claim.");
-      // focus error box for a11y
       setTimeout(() => document.getElementById("error-box")?.focus(), 0);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const title = item?.title ? `Claim: ${item.title}` : "Claim Item";
-  const backToItemHref = `${BASE}/item/?id=${encodeURIComponent(itemId)}`;
+  /* ===== After success: auto-redirect back to Search in 5s ===== */
   const backToSearchHref = `${BASE}/search`;
+  const backToItemHref = `${BASE}/item/?id=${encodeURIComponent(itemId || "")}`;
+  useEffect(() => {
+    if (!submittedId) return;
+    const t = setTimeout(() => {
+      window.location.href = backToSearchHref;
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [submittedId, backToSearchHref]);
+
+  const title = item?.title ? `Claim: ${item.title}` : "Claim Item";
   const imgSrc = publicUrlFromPath(item?.photo_url);
+  const disableSubmit = !isValid || submitting || isGuest;
 
   return (
     <main className="min-h-[100svh] bg-gradient-to-b from-[#0b2c5c0d] to-transparent">
@@ -283,7 +381,7 @@ export default function ClaimPage() {
           <div
             id="error-box"
             tabIndex={-1}
-            className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 focus:outline-none"
+            className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 focus-outline-none"
           >
             {err}
           </div>
@@ -323,189 +421,138 @@ export default function ClaimPage() {
               </div>
             </section>
 
-            {/* Form */}
-            <form
-              onSubmit={onSubmit}
-              noValidate
-              className="mt-6 rounded-2xl border bg-white p-5 shadow-sm"
-            >
-              {/* Honeypot (hidden) */}
-              <input
-                type="text"
-                name="website"
-                tabIndex={-1}
-                autoComplete="off"
-                className="hidden"
-                onChange={(e) => setHoneypot(e.target.value)}
-              />
+            {/* If guest, show login prompt */}
+            {isGuest && <LoginPrompt backHref={backToItemHref} />}
 
-              <p className="mb-5 text-sm text-gray-600" id="form-guide">
-                Provide <span className="font-medium">either</span> a detailed
-                message <span className="font-medium">or</span> one proof
-                detail. Please don’t include sensitive personal info.
-              </p>
+            {/* Form (only if NOT submitted yet) */}
+            {canShowForm && (
+              <form
+                onSubmit={onSubmit}
+                noValidate
+                className="mt-6 rounded-2xl border bg-white p-5 shadow-sm"
+              >
+                {/* Honeypot (hidden) */}
+                <input
+                  type="text"
+                  inputMode="none"
+                  name="hp_cc_lf_v1"
+                  tabIndex={-1}
+                  autoComplete="new-password"
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    left: "-9999px",
+                    width: 0,
+                    height: 0,
+                  }}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                />
 
-              <div className="grid gap-5 md:grid-cols-2">
-                {/* Name */}
-                <div>
-                  <Label htmlFor="name" required>
-                    Full Name
-                  </Label>
-                  <input
-                    id="name"
-                    autoComplete="name"
-                    value={claimantName}
-                    onChange={(e) => setClaimantName(e.target.value)}
-                    required
-                    aria-invalid={!vName}
-                    aria-describedby="form-guide"
-                    className="mt-1 w-full rounded-xl border p-2.5 text-sm outline-none transition focus:ring-2"
-                    style={{
-                      borderColor: vName ? "#e5e7eb" : "#fecaca",
-                      boxShadow: vName ? undefined : "0 0 0 2px #fee2e2 inset",
-                    }}
-                    placeholder="e.g., John Smith"
-                  />
-                </div>
+                {/* Read-only identity */}
+                {isAuthed && (
+                  <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                    Signed in as <b>{claimantName || "Student"}</b>{" "}
+                    <span className="text-gray-500">
+                      {claimantEmail ? `(${claimantEmail})` : ""}
+                    </span>
+                  </div>
+                )}
 
-                {/* Email */}
-                <div>
-                  <Label htmlFor="email" required>
-                    Contact Email
-                  </Label>
-                  <input
-                    id="email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    value={claimantEmail}
-                    onChange={(e) => setClaimantEmail(e.target.value)}
-                    required
-                    aria-invalid={!vEmail}
-                    aria-describedby="form-guide email-help"
-                    className="mt-1 w-full rounded-xl border p-2.5 text-sm outline-none transition focus:ring-2"
-                    style={{
-                      borderColor: vEmail ? "#e5e7eb" : "#fecaca",
-                      boxShadow: vEmail ? undefined : "0 0 0 2px #fee2e2 inset",
-                    }}
-                    placeholder="johnsmith@cherrycreekschools.org"
-                  />
-                  <Help id="email-help">
-                    We’ll contact you about this claim at this address.
-                  </Help>
-                </div>
+                <p className="mb-5 text-sm text-gray-600" id="form-guide">
+                  Message and proof details are <b>optional</b>. Share anything
+                  that helps us verify it’s yours. Please don’t include
+                  sensitive personal info.
+                </p>
 
-                {/* Message (optional, full width) */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="message">Message (optional)</Label>
-                  <textarea
-                    id="message"
-                    rows={6}
-                    maxLength={1000}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onFocus={() => setMsgFocused(true)}
-                    onBlur={() => setMsgFocused(false)}
-                    aria-invalid={!vMessage && !vAnyProof}
-                    aria-describedby="form-guide msg-help message-count"
-                    className="mt-1 w-full rounded-xl border p-3 text-sm outline-none transition focus:ring-2"
-                    style={{
-                      borderColor:
-                        vMessage || vAnyProof ? "#e5e7eb" : "#fecaca",
-                      boxShadow:
-                        vMessage || vAnyProof
-                          ? undefined
-                          : "0 0 0 2px #fee2e2 inset",
-                    }}
-                    placeholder={`Helpful details:
+                <div className="grid gap-5 md:grid-cols-2">
+                  {/* Message (optional) */}
+                  <div className="md:col-span-2">
+                    <Label htmlFor="message">Message (optional)</Label>
+                    <textarea
+                      id="message"
+                      rows={6}
+                      maxLength={1000}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      className="mt-1 w-full rounded-xl border p-3 text-sm outline-none transition focus-ring-2"
+                      placeholder={`Helpful details:
 • Where you think you left it (room/hallway/cafeteria)
 • When you last saw it
 • Description (color/brand/case/unique marks)
 • Anything only you would know (engraving, last 4, stickers)`}
-                  />
-                  <div className="mt-1 flex items-center justify-between">
-                    <Help id="msg-help">
-                      Give a detailed message or at least one proof below.
-                    </Help>
-                    {msgFocused && (
-                      <span
-                        id="message-count"
-                        className={`text-xs ${
-                          vMessage ? "text-gray-500" : "text-red-600"
-                        }`}
-                      >
-                        {message.trim().length}/20
+                    />
+                  </div>
+
+                  {/* Proof #1 (optional) */}
+                  <div>
+                    <Label htmlFor="q1">
+                      Proof detail #1 (optional){" "}
+                      <span className="font-normal text-gray-500">
+                        — brand, case color, last 4 digits, engraving
                       </span>
-                    )}
+                    </Label>
+                    <input
+                      id="q1"
+                      value={q1}
+                      onChange={(e) => setQ1(e.target.value)}
+                      spellCheck={false}
+                      className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm outline-none transition focus-ring-2 focus-ring-[rgba(11,44,92,.25)]"
+                      placeholder="e.g., Last 4 digits on the case: 1420"
+                    />
+                    <Help>Only share details someone else wouldn’t know.</Help>
+                  </div>
+
+                  {/* Proof #2 (optional) */}
+                  <div>
+                    <Label htmlFor="q2">Proof detail #2 (optional)</Label>
+                    <input
+                      id="q2"
+                      value={q2}
+                      onChange={(e) => setQ2(e.target.value)}
+                      spellCheck={false}
+                      className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm outline-none transition focus-ring-2 focus-ring-[rgba(11,44,92,.25)]"
+                      placeholder="Anything else that proves it's yours"
+                    />
                   </div>
                 </div>
 
-                {/* Proof #1 (optional) */}
-                <div>
-                  <Label htmlFor="q1">
-                    Proof detail #1 (optional){" "}
-                    <span className="font-normal text-gray-500">
-                      — try brand, case color, last 4 digits, engraving
-                    </span>
-                  </Label>
-                  <input
-                    id="q1"
-                    value={q1}
-                    onChange={(e) => setQ1(e.target.value)}
-                    spellCheck={false}
-                    aria-describedby="form-guide proof1-help"
-                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm outline-none transition focus:ring-2 focus:ring-[rgba(11,44,92,.25)]"
-                    placeholder="e.g., Last 4 digits on the case: 1420"
-                  />
-                  <Help id="proof1-help">
-                    Only share details someone else wouldn’t know.
-                  </Help>
+                {/* Actions */}
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={disableSubmit}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99] disabled:opacity-60"
+                  >
+                    {submitting && (
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-b-transparent" />
+                    )}
+                    {submitting ? "Submitting…" : "Submit Claim"}
+                  </button>
+                  <Link
+                    href={backToItemHref}
+                    className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                  >
+                    Cancel
+                  </Link>
                 </div>
+              </form>
+            )}
 
-                {/* Proof #2 (optional) */}
-                <div>
-                  <Label htmlFor="q2">Proof detail #2 (optional)</Label>
-                  <input
-                    id="q2"
-                    value={q2}
-                    onChange={(e) => setQ2(e.target.value)}
-                    spellCheck={false}
-                    className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm outline-none transition focus:ring-2 focus:ring-[rgba(11,44,92,.25)]"
-                    placeholder="Anything else that proves it's yours"
-                  />
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <button
-                  type="submit"
-                  disabled={!isValid || submitting}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99] disabled:opacity-60"
-                >
-                  {submitting && (
-                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-b-transparent" />
-                  )}
-                  {submitting ? "Submitting…" : "Submit Claim"}
-                </button>
-                <Link
-                  href={backToItemHref}
-                  className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-                >
-                  Cancel
-                </Link>
-              </div>
-
-              {submittedId && (
-                <div
-                  className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800"
-                  role="status"
-                >
-                  ✅ Claim received! We’ll review and contact you at{" "}
-                  <b>{claimantEmail || "your email"}</b>.
-                  <br />
+            {/* Success screen (replaces form) */}
+            {submittedId && (
+              <section className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-6 text-green-900">
+                <h2 className="text-lg font-semibold mb-2">
+                  ✅ Claim received!
+                </h2>
+                <p className="text-sm mb-2">
+                  We’ll review and contact you at{" "}
+                  <b>{claimantEmail || "your school email"}</b>.
+                </p>
+                <p className="text-sm mb-4">
                   Reference ID:{" "}
-                  <code className="font-mono">{String(submittedId)}</code>
+                  <code className="font-mono text-green-800">
+                    {String(submittedId)}
+                  </code>
                   <button
                     type="button"
                     className="ml-2 inline-flex items-center rounded border px-2 py-0.5 text-xs"
@@ -516,34 +563,50 @@ export default function ClaimPage() {
                   >
                     Copy
                   </button>
-                  <div className="mt-1 text-gray-700">
-                    Pick up at the Front Office during school hours. Bring your
-                    student ID.
-                  </div>
+                </p>
+                <p className="text-sm mb-5">
+                  Pick up at the Front Office during school hours. Bring your
+                  student ID.
+                </p>
+                <div className="flex gap-3">
+                  <Link
+                    href={backToSearchHref}
+                    className="inline-flex items-center justify-center rounded-lg bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99]"
+                  >
+                    ← Back to Search
+                  </Link>
+                  <Link
+                    href={backToItemHref}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                  >
+                    View Item
+                  </Link>
                 </div>
-              )}
-            </form>
+                <div className="mt-3 text-xs text-green-800/80">
+                  Redirecting back to search in ~5 seconds…
+                </div>
+              </section>
+            )}
 
-            {/* Sticky submit bar (mobile) */}
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 block p-3 md:hidden">
-              <div className="pointer-events-auto mx-auto max-w-lg rounded-2xl border bg-white p-3 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() =>
-                    (
-                      document.querySelector("form") as HTMLFormElement
-                    )?.requestSubmit()
-                  }
-                  disabled={!isValid || submitting}
-                  className="w-full rounded-xl bg-[#BF1E2E] px-4 py-3 text-center text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {submitting && (
-                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-b-transparent" />
-                  )}
-                  {submitting ? "Submitting…" : "Submit Claim"}
-                </button>
+            {/* Sticky submit bar (mobile) — only when form is visible */}
+            {!submittedId && (
+              <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 block p-3 md:hidden">
+                <div className="pointer-events-auto mx-auto max-w-lg rounded-2xl border bg-white p-3 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      (
+                        document.querySelector("form") as HTMLFormElement
+                      )?.requestSubmit()
+                    }
+                    disabled={disableSubmit}
+                    className="w-full rounded-xl bg-[#BF1E2E] px-4 py-3 text-center text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {submitting ? "Submitting…" : "Submit Claim"}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
 

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
@@ -19,18 +20,39 @@ const nav = [
 ];
 
 function shouldShowNoticeNow(): boolean {
-  if (typeof window === "undefined") return false; // don't render on server to avoid mismatch
+  if (typeof window === "undefined") return false; // avoid SSR mismatch
   const raw = window.localStorage.getItem(NOTICE_NEXT_SHOW_KEY);
-  if (!raw) return true; // never dismissed -> show
+  if (!raw) return true;
   const nextShowAt = parseInt(raw, 10) || 0;
-  return Date.now() >= nextShowAt; // show only if we're past the next-show time
+  return Date.now() >= nextShowAt;
 }
+
+type AuthState = "loading" | "guest" | "authed";
 
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
-  // null = not decided yet; avoids initial flash
   const [showNotice, setShowNotice] = useState<null | boolean>(null);
+
+  // ===== Auth state =====
+  const [auth, setAuth] = useState<AuthState>("loading");
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // login panel UI
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // login form
+  const [emailInput, setEmailInput] = useState("");
+  const [pwdInput, setPwdInput] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginErr, setLoginErr] = useState<string | null>(null);
+
+  // school domain guard
+  const schoolDomainAllowed = useMemo(
+    () => emailInput.trim().toLowerCase().endsWith("@cherrycreekschools.org"),
+    [emailInput]
+  );
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 6);
@@ -39,14 +61,89 @@ export function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Decide visibility on mount (client-only) to prevent flicker
+  // Decide notice visibility (client-only)
   useEffect(() => {
     setShowNotice(shouldShowNoticeNow());
   }, []);
 
+  // Auth: load + subscribe
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const u = data.session?.user ?? null;
+      setAuth(u ? "authed" : "guest");
+      setUserEmail(u?.email ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      const u = session?.user ?? null;
+      setAuth(u ? "authed" : "guest");
+      setUserEmail(u?.email ?? null);
+      if (u) setPanelOpen(false);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Open panel from URL (?login=1)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.get("login") === "1") setPanelOpen(true);
+    } catch {}
+  }, []);
+
+  // Open panel from global event
+  useEffect(() => {
+    const open = () => setPanelOpen(true);
+    document.addEventListener("cc-auth:open", open as EventListener);
+    return () =>
+      document.removeEventListener("cc-auth:open", open as EventListener);
+  }, []);
+
+  // Click-outside to close login panel
+  useEffect(() => {
+    if (!panelOpen) return;
+    function onClick(e: MouseEvent) {
+      if (!panelRef.current) return;
+      if (!panelRef.current.contains(e.target as Node)) setPanelOpen(false);
+    }
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [panelOpen]);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginErr(null);
+
+    if (!schoolDomainAllowed) {
+      setLoginErr("Please use your @cherrycreekschools.org email.");
+      return;
+    }
+
+    setLoginBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailInput.trim(),
+      password: pwdInput,
+    });
+    setLoginBusy(false);
+
+    if (error) {
+      setLoginErr(error.message);
+      return;
+    }
+
+    // success
+    setEmailInput("");
+    setPwdInput("");
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setPanelOpen(false);
+  }
+
   return (
     <>
-      {/* Top Bar (glass + gradient + shrink on scroll) */}
+      {/* Top Bar */}
       <header
         className={[
           "sticky top-0 z-40 text-white transition-all duration-300",
@@ -123,8 +220,9 @@ export function Header() {
             </nav>
           </div>
 
-          {/* Right: Search (glass chip) */}
-          <div className="flex items-center gap-3">
+          {/* Right: Search + Auth */}
+          <div className="relative flex items-center gap-3">
+            {/* Search chip */}
             <Link
               href="/search"
               className={[
@@ -140,6 +238,107 @@ export function Header() {
               <Search size={18} />
               <span className="hidden sm:inline">Search</span>
             </Link>
+
+            {/* Auth UI */}
+            {auth === "loading" && (
+              <span className="rounded-full px-3 py-2 text-sm border border-white/30 bg-white/10">
+                Checking…
+              </span>
+            )}
+
+            {auth === "guest" && (
+              <div className="relative" ref={panelRef}>
+                {/* Trigger chip */}
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen((v) => !v)}
+                  className={[
+                    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
+                    "border border-white/30 bg-white/10",
+                    "hover:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/60",
+                    "transition shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]",
+                  ].join(" ")}
+                  aria-expanded={panelOpen}
+                  aria-controls="login-panel"
+                >
+                  Sign in
+                </button>
+
+                {/* Floating login panel */}
+                {panelOpen && (
+                  <div
+                    id="login-panel"
+                    className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/25 bg-white/95 text-gray-900 shadow-xl backdrop-blur p-4"
+                  >
+                    <h3 className="text-sm font-semibold text-gray-800">
+                      Sign in to claim items
+                    </h3>
+                    <p className="mt-1 text-xs text-gray-600">
+                      Use your <b>@cherrycreekschools.org</b> email.
+                    </p>
+
+                    <form onSubmit={handleLogin} className="mt-3 space-y-2">
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        placeholder="you@cherrycreekschools.org"
+                        required
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2"
+                      />
+                      <input
+                        type="password"
+                        value={pwdInput}
+                        onChange={(e) => setPwdInput(e.target.value)}
+                        placeholder="Password"
+                        required
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2"
+                      />
+
+                      {loginErr && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                          {loginErr}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={loginBusy}
+                        className="w-full rounded-xl bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99] disabled:opacity-60"
+                      >
+                        {loginBusy ? "Signing in…" : "Sign In"}
+                      </button>
+                    </form>
+
+                    <button
+                      className="absolute right-2 top-2 rounded p-1 text-gray-500 hover:bg-gray-100"
+                      aria-label="Close"
+                      onClick={() => setPanelOpen(false)}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {auth === "authed" && (
+              <div className="flex items-center gap-2">
+                <span
+                  className="max-w-[170px] truncate rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm"
+                  title={userEmail ?? ""}
+                >
+                  {userEmail}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm hover:bg-white/18 transition"
+                  title="Sign out"
+                >
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -159,7 +358,7 @@ export function Header() {
         }}
       />
 
-      {/* ⚠️ Dismissible Notice — no flash, reappears after 1 day */}
+      {/* ⚠️ Dismissible Notice */}
       {showNotice === true && (
         <div
           role="region"
