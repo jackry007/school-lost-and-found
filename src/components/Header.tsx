@@ -138,7 +138,7 @@ export function Header() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    setPanelOpen(false);
+    window.location.reload(); // refresh the page
   }
 
   return (
