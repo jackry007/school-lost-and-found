@@ -12,6 +12,17 @@ import type { Item, Claim } from "@/lib/types";
 type ItemStatusWidened = Item["status"] | "pending" | "rejected";
 type StatusFilter = "all" | "pending" | "listed" | "claimed" | "rejected";
 
+type ChatMessage = {
+  id: number;
+  claim_id: number;
+  sender_uid: string;
+  sender_role: "staff" | "student";
+  body: string;
+  created_at: string;
+  seen_by_claimant: boolean | null;
+  seen_by_staff: boolean | null;
+};
+
 const CREEK_RED = "#b10015"; // deep scarlet
 const CREEK_NAVY = "#0f2741"; // dark navy
 const CREEK_SOFTR = "#fef2f3"; // soft red tint
@@ -217,11 +228,20 @@ export default function AdminPage() {
   const [schedAt, setSchedAt] = useState(""); // HTML datetime-local
   const [schedBusy, setSchedBusy] = useState(false);
 
+  // ----- Chat modal -----
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatClaim, setChatClaim] = useState<Claim | null>(null);
+
   function openSchedule(c: Claim) {
     setSchedClaim(c);
     const at = (c as any).schedule_at as string | null | undefined;
     setSchedAt(at ? new Date(at).toISOString().slice(0, 16) : "");
     setSchedOpen(true);
+  }
+
+  function openChat(c: Claim) {
+    setChatClaim(c);
+    setChatOpen(true);
   }
 
   async function saveSchedule() {
@@ -375,12 +395,10 @@ export default function AdminPage() {
     setApproveBusy(false);
 
     // show undo toast (5s)
-    let undone = false;
     addToast(`Approved: “${approveTarget.title}”`, {
       actionLabel: "Undo (5s)",
       ttl: 5000,
       onAction: async () => {
-        undone = true;
         await supabase.from("items").update({ status: "pending" }).eq("id", id);
         moveItemLocally(id, "pending");
       },
@@ -397,8 +415,6 @@ export default function AdminPage() {
       addToast(`Error listing item: ${error.message}`);
       return;
     }
-
-    // if no undo after 5s, nothing else to do
   };
 
   // Reject
@@ -756,6 +772,11 @@ export default function AdminPage() {
                       </button>
                     )}
 
+                    {/* Message */}
+                    <Btn tone="ghost" onClick={() => openChat(c)}>
+                      Message
+                    </Btn>
+
                     {/* Schedule / Reschedule */}
                     <Btn tone="ghost" onClick={() => openSchedule(c)}>
                       {schedChip ? "Reschedule" : "Schedule"}
@@ -1020,6 +1041,18 @@ export default function AdminPage() {
           </p>
         ) : null}
       </ConfirmModal>
+
+      {/* Chat Modal */}
+      {chatOpen && chatClaim && (
+        <ChatModal
+          claim={chatClaim}
+          meIsStaff={true}
+          onClose={() => {
+            setChatOpen(false);
+            setChatClaim(null);
+          }}
+        />
+      )}
 
       {/* Toast outlet */}
       {toastNode}
@@ -1312,6 +1345,221 @@ function Thumb({ src, alt }: { src?: string; alt?: string }) {
         className="h-full w-full object-cover"
         loading="lazy"
       />
+    </div>
+  );
+}
+
+/* =========================================================
+   Chat Modal (per-claim chat)
+   ======================================================= */
+function ChatModal({
+  claim,
+  meIsStaff,
+  onClose,
+}: {
+  claim: Claim;
+  meIsStaff: boolean;
+  onClose: () => void;
+}) {
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [myUid, setMyUid] = useState<string | null>(null);
+
+  // load current user + messages
+  useEffect(() => {
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      setMyUid(u.user?.id ?? null);
+
+      const { data } = await supabase
+        .from("claim_messages")
+        .select("*")
+        .eq("claim_id", claim.id)
+        .order("created_at", { ascending: true });
+
+      setMsgs((data as ChatMessage[]) || []);
+
+      // mark seen (staff side)
+      await supabase
+        .from("claim_messages")
+        .update({ seen_by_staff: true })
+        .eq("claim_id", claim.id)
+        .neq("sender_uid", u.user?.id ?? "");
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claim.id]);
+
+  // realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel(`claim_messages:claim:${claim.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "claim_messages",
+          filter: `claim_id=eq.${claim.id}`,
+        },
+        (payload) => {
+          setMsgs((m) => [...m, payload.new as ChatMessage]);
+          // auto-mark seen when staff has it open
+          if (meIsStaff) {
+            const row = payload.new as ChatMessage;
+            if (row.sender_uid !== myUid) {
+              supabase
+                .from("claim_messages")
+                .update({ seen_by_staff: true })
+                .eq("id", row.id);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [claim.id, meIsStaff, myUid]);
+
+  // autoscroll
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 1e9, behavior: "smooth" });
+  }, [msgs.length]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || !myUid) return;
+    setBusy(true);
+
+    // optimistic add
+    const optimistic: ChatMessage = {
+      id: Date.now(),
+      claim_id: claim.id,
+      sender_uid: myUid,
+      sender_role: meIsStaff ? "staff" : "student",
+      body: text,
+      created_at: new Date().toISOString(),
+      seen_by_claimant: meIsStaff ? false : true,
+      seen_by_staff: meIsStaff ? true : false,
+    };
+    setMsgs((m) => [...m, optimistic]);
+    setInput("");
+
+    const { error } = await supabase.from("claim_messages").insert({
+      claim_id: claim.id,
+      sender_uid: myUid,
+      sender_role: meIsStaff ? "staff" : "student",
+      body: text,
+      seen_by_claimant: meIsStaff ? false : true,
+      seen_by_staff: meIsStaff ? true : false,
+    });
+
+    if (error) {
+      // rollback optimistic (remove last optimistic by id)
+      setMsgs((m) => m.filter((x) => x.id !== optimistic.id));
+      alert(`Send failed: ${error.message}`);
+      setInput(text); // restore text
+    }
+    setBusy(false);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60]">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="flex w-[95%] max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div
+            className="flex items-center justify-between px-4 py-3 text-white"
+            style={{
+              background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+            }}
+          >
+            <div className="text-sm">
+              <div className="font-semibold">Claim #{claim.id}</div>
+              <div className="text-white/80">
+                {claim.claimant_name} ({claim.claimant_email})
+              </div>
+            </div>
+            <button
+              className="rounded px-3 py-1 text-sm text-white hover:bg-white/10"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+
+          {/* messages */}
+          <div
+            ref={listRef}
+            className="max-h-[60vh] min-h-[40vh] overflow-y-auto bg-gray-50 p-4"
+          >
+            {msgs.length === 0 && (
+              <div className="py-10 text-center text-sm text-gray-500">
+                No messages yet. Say hi 👋
+              </div>
+            )}
+            <div className="space-y-2">
+              {msgs.map((m) => {
+                const mine = m.sender_uid === myUid;
+                return (
+                  <div
+                    key={m.id}
+                    className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                        mine
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white text-gray-800 border border-gray-200"
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap">{m.body}</div>
+                      <div
+                        className={`mt-1 text-[10px] ${
+                          mine ? "text-white/80" : "text-gray-500"
+                        }`}
+                      >
+                        {new Date(m.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* composer */}
+          <div className="border-t border-gray-200 p-3">
+            <textarea
+              className="h-20 w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
+              placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              disabled={busy}
+            />
+            <div className="mt-2 flex items-center justify-end">
+              <button
+                onClick={send}
+                disabled={busy || input.trim().length === 0}
+                className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow disabled:opacity-60"
+              >
+                {busy ? "Sending…" : "Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
