@@ -19,6 +19,8 @@ const CREEK_SOFTN = "#f1f5fb"; // soft navy tint
 
 // ---------- Images (Supabase Storage) ----------
 const BUCKET = "item-photos";
+const CLAIM_BUCKET = "claim-photos"; // change if your proof photos live elsewhere
+
 const FALLBACK_THUMB =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -29,6 +31,13 @@ const FALLBACK_THUMB =
             font-size='12' fill='#9ca3af'>no image</text>
     </svg>`
   );
+
+function publicUrlFrom(bucket: string, path?: string | null) {
+  if (!path) return FALLBACK_THUMB;
+  if (/^https?:\/\//i.test(path)) return path; // already a URL
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data?.publicUrl || FALLBACK_THUMB;
+}
 
 /* =========================================================
    Tiny Toast system (self-contained)
@@ -191,6 +200,52 @@ export default function AdminPage() {
 
   // thumbnails cache: item.id -> public url
   const [thumbMap, setThumbMap] = useState<Record<number, string>>({});
+
+  // ----- Photo lightbox -----
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoTitle, setPhotoTitle] = useState<string>("");
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  function openPhotos(title: string, urls: string[]) {
+    setPhotoTitle(title);
+    setPhotoUrls(urls);
+    setPhotoOpen(true);
+  }
+
+  // ----- Schedule modal (only schedule_at) -----
+  const [schedOpen, setSchedOpen] = useState(false);
+  const [schedClaim, setSchedClaim] = useState<Claim | null>(null);
+  const [schedAt, setSchedAt] = useState(""); // HTML datetime-local
+  const [schedBusy, setSchedBusy] = useState(false);
+
+  function openSchedule(c: Claim) {
+    setSchedClaim(c);
+    const at = (c as any).schedule_at as string | null | undefined;
+    setSchedAt(at ? new Date(at).toISOString().slice(0, 16) : "");
+    setSchedOpen(true);
+  }
+
+  async function saveSchedule() {
+    if (!schedClaim) return;
+    setSchedBusy(true);
+    const iso = schedAt ? new Date(schedAt).toISOString() : null;
+
+    const { error } = await supabase
+      .from("claims")
+      .update({ schedule_at: iso })
+      .eq("id", schedClaim.id);
+
+    setSchedBusy(false);
+    if (error) return addToast(`Error scheduling: ${error.message}`);
+
+    addToast(
+      iso
+        ? `Pickup scheduled for claim #${schedClaim.id}`
+        : `Pickup cleared for claim #${schedClaim.id}`
+    );
+    setSchedOpen(false);
+    setSchedClaim(null);
+    load(); // refresh list to show chip
+  }
 
   /* ---------------- Auth + load ---------------- */
   const load = async () => {
@@ -401,6 +456,34 @@ export default function AdminPage() {
     (i) => (i.status as ItemStatusWidened) === "pending"
   );
   const pendingClaims = claims.filter((c) => c.status === "pending");
+
+  // Build thumbs per claim: item photo + proof photos
+  const claimThumbs = useMemo(() => {
+    const map: Record<number, { itemThumb: string; proofs: string[] }> = {};
+    for (const c of claims) {
+      const item = items.find((i) => i.id === c.item_id);
+      const itemThumb = item
+        ? thumbMap[item.id] ?? FALLBACK_THUMB
+        : FALLBACK_THUMB;
+
+      let proofs: string[] = [];
+      if (c.proof && c.proof.trim()) {
+        try {
+          const parsed = JSON.parse(c.proof);
+          if (Array.isArray(parsed)) {
+            proofs = parsed.map((p: string) => publicUrlFrom(CLAIM_BUCKET, p));
+          } else {
+            proofs = [publicUrlFrom(CLAIM_BUCKET, c.proof)];
+          }
+        } catch {
+          proofs = [publicUrlFrom(CLAIM_BUCKET, c.proof)];
+        }
+      }
+
+      map[c.id] = { itemThumb, proofs };
+    }
+    return map;
+  }, [claims, items, thumbMap]);
 
   const visibleItems = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -619,30 +702,81 @@ export default function AdminPage() {
             {pendingClaims.length === 0 && (
               <EmptyRow text="No pending claims." />
             )}
-            {pendingClaims.map((c) => (
-              <Row key={c.id}>
-                <RowInfo
-                  title={`Claim #${c.id} → Item #${c.item_id}`}
-                  meta={`${c.claimant_name} (${c.claimant_email})${
-                    c.proof ? ` · Proof: ${c.proof}` : ""
-                  }`}
-                />
-                <RowActions>
-                  <Btn
-                    tone="primary"
-                    onClick={() => updateClaim(c.id, "approved")}
-                  >
-                    Approve
-                  </Btn>
-                  <Btn
-                    tone="danger"
-                    onClick={() => updateClaim(c.id, "rejected")}
-                  >
-                    Reject
-                  </Btn>
-                </RowActions>
-              </Row>
-            ))}
+
+            {pendingClaims.map((c) => {
+              const t = claimThumbs[c.id];
+              const sched = (c as any).schedule_at as string | null | undefined;
+              const schedChip = sched ? new Date(sched).toLocaleString() : null;
+
+              return (
+                <Row key={c.id}>
+                  {/* Left: item thumb + info */}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
+                    <RowInfo
+                      title={
+                        <>
+                          Claim #{c.id} → Item #{c.item_id}
+                          {schedChip && (
+                            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800">
+                              {schedChip}
+                            </span>
+                          )}
+                        </>
+                      }
+                      meta={
+                        <>
+                          {c.claimant_name} ({c.claimant_email})
+                          {c.proof && (
+                            <>
+                              {" "}
+                              ·{" "}
+                              <span className="text-gray-500">
+                                proof attached
+                              </span>
+                            </>
+                          )}
+                        </>
+                      }
+                    />
+                  </div>
+
+                  {/* Right: actions */}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {/* Proof viewer */}
+                    {t?.proofs?.length > 0 && (
+                      <button
+                        className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                        onClick={() =>
+                          openPhotos(`Proof photos — Claim #${c.id}`, t.proofs)
+                        }
+                        title="View proof photos"
+                      >
+                        View Proofs ({t.proofs.length})
+                      </button>
+                    )}
+
+                    {/* Schedule / Reschedule */}
+                    <Btn tone="ghost" onClick={() => openSchedule(c)}>
+                      {schedChip ? "Reschedule" : "Schedule"}
+                    </Btn>
+
+                    <Btn
+                      tone="primary"
+                      onClick={() => updateClaim(c.id, "approved")}
+                    >
+                      Approve
+                    </Btn>
+                    <Btn
+                      tone="danger"
+                      onClick={() => updateClaim(c.id, "rejected")}
+                    >
+                      Reject
+                    </Btn>
+                  </div>
+                </Row>
+              );
+            })}
           </div>
         </section>
 
@@ -818,6 +952,52 @@ export default function AdminPage() {
             </Btn>
             <Btn tone="primary" onClick={saveEdit}>
               Save changes
+            </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Photo Lightbox */}
+      {photoOpen && (
+        <Modal title={photoTitle} onClose={() => setPhotoOpen(false)}>
+          {photoUrls.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {photoUrls.map((u, i) => (
+                <div key={i} className="overflow-hidden rounded-xl border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={u} alt="" className="w-full object-contain" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600">No photos attached.</div>
+          )}
+        </Modal>
+      )}
+
+      {/* Schedule Modal (only date/time) */}
+      {schedOpen && (
+        <Modal
+          title={`Schedule Pickup — Claim #${schedClaim?.id}`}
+          onClose={() => setSchedOpen(false)}
+        >
+          <div className="grid gap-3">
+            <Labeled label="Date & time">
+              <input
+                type="datetime-local"
+                value={schedAt}
+                onChange={(e) => setSchedAt(e.target.value)}
+                className="rounded-xl border px-3 py-2"
+              />
+            </Labeled>
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Btn tone="ghost" onClick={() => setSchedOpen(false)}>
+              Cancel
+            </Btn>
+            <Btn tone="primary" onClick={saveSchedule}>
+              {schedBusy ? "Saving…" : "Save"}
             </Btn>
           </div>
         </Modal>

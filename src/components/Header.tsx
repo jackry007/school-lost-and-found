@@ -5,22 +5,17 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import MessagesPortal from "@/components/MessagesPortal";
 
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
 
-// Persist when the banner may show again
+// Notice bar timing
 const NOTICE_NEXT_SHOW_KEY = "cc-lostfound-notice:nextShowAt:v1";
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
-const nav = [
-  { href: "/", label: "Lost & Found" },
-  { href: "/report", label: "Report Found Item" },
-  { href: "/admin", label: "Admin" },
-];
-
 function shouldShowNoticeNow(): boolean {
-  if (typeof window === "undefined") return false; // avoid SSR mismatch
+  if (typeof window === "undefined") return false;
   const raw = window.localStorage.getItem(NOTICE_NEXT_SHOW_KEY);
   if (!raw) return true;
   const nextShowAt = parseInt(raw, 10) || 0;
@@ -28,6 +23,7 @@ function shouldShowNoticeNow(): boolean {
 }
 
 type AuthState = "loading" | "guest" | "authed";
+type ProfileRole = "admin" | "staff" | "user";
 
 export function Header() {
   const pathname = usePathname();
@@ -37,23 +33,17 @@ export function Header() {
   // ===== Auth state =====
   const [auth, setAuth] = useState<AuthState>("loading");
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [role, setRole] = useState<ProfileRole | null>(null);
 
-  // login panel UI
+  // login panel
   const [panelOpen, setPanelOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  // login form
   const [emailInput, setEmailInput] = useState("");
   const [pwdInput, setPwdInput] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginErr, setLoginErr] = useState<string | null>(null);
 
-  // school domain guard
-  const schoolDomainAllowed = useMemo(
-    () => emailInput.trim().toLowerCase().endsWith("@cherrycreekschools.org"),
-    [emailInput]
-  );
-
+  // Scroll shadow
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 6);
     onScroll();
@@ -61,18 +51,28 @@ export function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Decide notice visibility (client-only)
+  // Notice display
   useEffect(() => {
     setShowNotice(shouldShowNoticeNow());
   }, []);
 
-  // Auth: load + subscribe
+  // Auth load + listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const loadAuth = async () => {
+      const { data } = await supabase.auth.getSession();
       const u = data.session?.user ?? null;
       setAuth(u ? "authed" : "guest");
       setUserEmail(u?.email ?? null);
-    });
+      if (!u) return;
+      // fetch role from profiles
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("uid", u.id)
+        .single();
+      setRole((prof?.role as ProfileRole) ?? "user");
+    };
+    loadAuth();
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
       const u = session?.user ?? null;
       setAuth(u ? "authed" : "guest");
@@ -82,24 +82,7 @@ export function Header() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Open panel from URL (?login=1)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const u = new URL(window.location.href);
-      if (u.searchParams.get("login") === "1") setPanelOpen(true);
-    } catch {}
-  }, []);
-
-  // Open panel from global event
-  useEffect(() => {
-    const open = () => setPanelOpen(true);
-    document.addEventListener("cc-auth:open", open as EventListener);
-    return () =>
-      document.removeEventListener("cc-auth:open", open as EventListener);
-  }, []);
-
-  // Click-outside to close login panel
+  // Click outside login panel
   useEffect(() => {
     if (!panelOpen) return;
     function onClick(e: MouseEvent) {
@@ -110,14 +93,10 @@ export function Header() {
     return () => window.removeEventListener("mousedown", onClick);
   }, [panelOpen]);
 
+  // Handle login
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoginErr(null);
-
-    if (!schoolDomainAllowed) {
-      setLoginErr("Please use your @cherrycreekschools.org email.");
-      return;
-    }
 
     setLoginBusy(true);
     const { error } = await supabase.auth.signInWithPassword({
@@ -131,15 +110,38 @@ export function Header() {
       return;
     }
 
-    // success
+    // ✅ Fetch role immediately after login (no refresh needed)
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (uid) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("uid", uid)
+        .single();
+      if (prof?.role) setRole(prof.role);
+    }
+
     setEmailInput("");
     setPwdInput("");
+    setPanelOpen(false);
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    window.location.reload(); // refresh the page
+    window.location.reload();
   }
+
+  const nav = useMemo(
+    () => [
+      { href: "/", label: "Lost & Found" },
+      { href: "/report", label: "Report Found Item" },
+      ...(role === "admin" || role === "staff"
+        ? [{ href: "/admin", label: "Admin" }]
+        : []),
+    ],
+    [role]
+  );
 
   return (
     <>
@@ -165,12 +167,11 @@ export function Header() {
             scrolled ? "h-14" : "h-16",
           ].join(" ")}
         >
-          {/* Left: Brand + Nav */}
+          {/* Left: Logo + Nav */}
           <div className="flex items-center gap-7">
             <Link
               href="/"
               className="group flex items-center gap-3 rounded-lg px-2 py-1 transition no-underline decoration-0"
-              style={{ textDecoration: "none" }}
               aria-label="Cherry Creek Lost & Found Home"
             >
               <span className="text-2xl leading-none">🎒</span>
@@ -198,7 +199,6 @@ export function Header() {
                         ? "bg-yellow-400 text-red-900 shadow-[inset_0_-2px_0_rgba(0,0,0,.25)]"
                         : "text-white/90 hover:bg-white/15 hover:text-white",
                     ].join(" ")}
-                    style={{ textDecoration: "none" }}
                   >
                     {n.label}
                     <span
@@ -220,18 +220,16 @@ export function Header() {
             </nav>
           </div>
 
-          {/* Right: Search + Auth */}
+          {/* Right: Search + Auth / Messaging */}
           <div className="relative flex items-center gap-3">
             {/* Search chip */}
             <Link
               href="/search"
               className={[
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
-                "border border-white/30 bg-white/10",
-                "hover:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/60",
-                "transition shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]",
+                "border border-white/30 bg-white/10 hover:bg-white/18",
+                "focus:outline-none focus:ring-2 focus:ring-white/60 transition",
               ].join(" ")}
-              style={{ textDecoration: "none" }}
               aria-label="Search items"
               title="Search items"
             >
@@ -248,23 +246,16 @@ export function Header() {
 
             {auth === "guest" && (
               <div className="relative" ref={panelRef}>
-                {/* Trigger chip */}
                 <button
                   type="button"
                   onClick={() => setPanelOpen((v) => !v)}
-                  className={[
-                    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
-                    "border border-white/30 bg-white/10",
-                    "hover:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/60",
-                    "transition shadow-[inset_0_0_0_1px_rgba(255,255,255,.08)]",
-                  ].join(" ")}
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border border-white/30 bg-white/10 hover:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/60 transition"
                   aria-expanded={panelOpen}
                   aria-controls="login-panel"
                 >
                   Sign in
                 </button>
 
-                {/* Floating login panel */}
                 {panelOpen && (
                   <div
                     id="login-panel"
@@ -324,12 +315,16 @@ export function Header() {
 
             {auth === "authed" && (
               <div className="flex items-center gap-2">
+                {/* 💬 Messaging Portal */}
+                <MessagesPortal />
+
                 <span
                   className="max-w-[170px] truncate rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm"
                   title={userEmail ?? ""}
                 >
                   {userEmail}
                 </span>
+
                 <button
                   onClick={handleLogout}
                   className="rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm hover:bg-white/18 transition"
@@ -342,7 +337,6 @@ export function Header() {
           </div>
         </div>
 
-        {/* Navy keyline for contrast */}
         <div
           className="h-0.5 w-full"
           style={{ backgroundColor: `${CREEK_NAVY}EE` }}
@@ -363,12 +357,7 @@ export function Header() {
         <div
           role="region"
           aria-label="Important notice"
-          className={[
-            "relative bg-yellow-50 border-y border-yellow-200",
-            "text-center text-sm sm:text-base text-yellow-900",
-            "py-2 pl-4 pr-12 shadow-sm",
-            "transition-opacity duration-300 ease-out",
-          ].join(" ")}
+          className="relative bg-yellow-50 border-y border-yellow-200 text-center text-sm sm:text-base text-yellow-900 py-2 pl-4 pr-12 shadow-sm transition-opacity duration-300 ease-out"
         >
           ⚠️ <span className="font-semibold">Important Notice:</span> Items
           unclaimed after <strong>60 days</strong> may be donated or disposed of
@@ -385,14 +374,7 @@ export function Header() {
                 );
               } catch {}
             }}
-            className={[
-              "absolute right-2 top-1/2 -translate-y-1/2",
-              "inline-flex items-center justify-center",
-              "rounded-md p-2",
-              "text-yellow-900/80 hover:text-yellow-900",
-              "hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60",
-              "transition",
-            ].join(" ")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-md p-2 text-yellow-900/80 hover:text-yellow-900 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 transition"
             title="Dismiss"
           >
             <X size={18} aria-hidden="true" />
