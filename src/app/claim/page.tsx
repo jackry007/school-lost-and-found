@@ -1,16 +1,21 @@
+// /app/claim/page.tsx
 "use client";
 
 /**
- * Claim page
+ * Claim page (Option 1: /claim?item=ID)
  * - Identity comes from Supabase session (no name/email inputs)
  * - Message & proof fields are OPTIONAL
- * - After submit: show success screen and auto-redirect back to the search page in 5 s
+ * - After submit: navigate to /claim?item=ID&chat=1 so the student can message staff
+ * - If the page is opened with ?chat=1, auto-open ChatModal with the user's latest claim for that item
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+
+// ⬇️ Adjust this path to your project
+import ChatModal, { type ChatClaim } from "../../components/ChatModal";
 
 /* ========= Brand / env ========= */
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -135,8 +140,10 @@ function LoginPrompt({ backHref }: { backHref: string }) {
 
 /* ========= Page ========= */
 export default function ClaimPage() {
+  const router = useRouter();
   const sp = useSearchParams();
   const itemId = useMemo(() => sp.get("item")?.trim() ?? "", [sp]);
+  const wantsChat = useMemo(() => sp.get("chat") === "1", [sp]);
 
   const [item, setItem] = useState<ItemRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,6 +152,7 @@ export default function ClaimPage() {
   const [auth, setAuth] = useState<AuthState>("unknown");
 
   // Identity (read from session)
+  const [currentUid, setCurrentUid] = useState<string>("");
   const [claimantName, setClaimantName] = useState("Student");
   const [claimantEmail, setClaimantEmail] = useState<string>("");
 
@@ -155,6 +163,10 @@ export default function ClaimPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedId, setSubmittedId] = useState<number | string | null>(null);
   const [honeypot, setHoneypot] = useState("");
+
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatClaim, setChatClaim] = useState<ChatClaim | null>(null);
 
   /* ===== Boolean guards ===== */
   const isGuest: boolean = auth === "guest";
@@ -176,6 +188,7 @@ export default function ClaimPage() {
       const user = usr.user ?? session?.user ?? null;
 
       setAuth(session ? "authed" : "guest");
+      setCurrentUid(user?.id ?? "");
 
       if (user) {
         setClaimantEmail(user.email ?? "");
@@ -196,6 +209,7 @@ export default function ClaimPage() {
       const authed = !!s;
       setAuth(authed ? "authed" : "guest");
       const u = s?.user ?? null;
+      setCurrentUid(u?.id ?? "");
       setClaimantEmail(u?.email ?? "");
       setClaimantName(
         (u?.user_metadata?.full_name as string) ||
@@ -248,6 +262,44 @@ export default function ClaimPage() {
     };
   }, [itemId]);
 
+  /* ===== Open chat helper (latest claim for this user+item) ===== */
+  const openLatestChat = useCallback(async () => {
+    if (!currentUid || !item?.id) {
+      console.warn("[openLatestChat] missing uid or item.id");
+      return;
+    }
+
+    const { data: cl, error } = await supabase
+      .from("claims")
+      .select(
+        "id,item_id,claimant_name,claimant_email,claimant_uid,status,created_at,updated_at"
+      )
+      .eq("item_id", Number(item.id)) // ✅ force int match
+      .eq("claimant_uid", currentUid) // ✅ uuid match
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error("[openLatestChat] select error:", error.message);
+      return;
+    }
+
+    if (cl && cl.length > 0) {
+      console.log("[openLatestChat] found claim", cl[0]);
+      setChatClaim(cl[0] as ChatClaim);
+      setChatOpen(true);
+    } else {
+      console.warn("[openLatestChat] no claim found for this user+item");
+    }
+  }, [currentUid, item?.id]);
+
+  /* ===== Auto-open chat if ?chat=1 ===== */
+  useEffect(() => {
+    if (wantsChat && isAuthed && item?.id) {
+      openLatestChat();
+    }
+  }, [wantsChat, isAuthed, item?.id, openLatestChat]);
+
   /* ===== Submit ===== */
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -270,12 +322,15 @@ export default function ClaimPage() {
       });
 
       const inserted = created?.[0];
-      setSubmittedId(inserted?.id ?? null);
+      const newId = inserted?.id ?? null;
+      setSubmittedId(newId);
 
-      // Clear non-identity fields
-      setMessage("");
-      setQ1("");
-      setQ2("");
+      // 🚀 Immediately take the student to their thread (query-param version)
+      // We intentionally navigate to ?chat=1 (not /claim/[id]) to keep static export happy.
+      router.push(
+        `${BASE}/claim?item=${encodeURIComponent(String(item.id))}&chat=1`
+      );
+      return; // prevent showing the fallback success screen
     } catch (e: any) {
       setErr(e?.message || "Failed to submit claim.");
       setTimeout(() => document.getElementById("error-box")?.focus(), 0);
@@ -284,16 +339,8 @@ export default function ClaimPage() {
     }
   }
 
-  /* ===== After success: auto-redirect back to Search in 5s ===== */
   const backToSearchHref = `${BASE}/search`;
   const backToItemHref = `${BASE}/item/?id=${encodeURIComponent(itemId || "")}`;
-  useEffect(() => {
-    if (!submittedId) return;
-    const t = setTimeout(() => {
-      window.location.href = backToSearchHref;
-    }, 5000);
-    return () => clearTimeout(t);
-  }, [submittedId, backToSearchHref]);
 
   const title = item?.title ? `Claim: ${item.title}` : "Claim Item";
   const imgSrc = publicUrlFromPath(item?.photo_url);
@@ -346,6 +393,20 @@ export default function ClaimPage() {
                   : "—"}
               </span>
               {item.status && <StatusPill>{item.status}</StatusPill>}
+            </div>
+          )}
+
+          {/* Quick Messages button */}
+          {isAuthed && (
+            <div className="mt-3">
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50"
+                onClick={openLatestChat}
+                title="Open Messages"
+              >
+                Open Messages
+              </button>
             </div>
           )}
         </header>
@@ -538,7 +599,7 @@ export default function ClaimPage() {
               </form>
             )}
 
-            {/* Success screen (replaces form) */}
+            {/* Success fallback (only shows if we couldn't navigate for some reason) */}
             {submittedId && (
               <section className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-6 text-green-900">
                 <h2 className="text-lg font-semibold mb-2">
@@ -564,26 +625,21 @@ export default function ClaimPage() {
                     Copy
                   </button>
                 </p>
-                <p className="text-sm mb-5">
-                  Pick up at the Front Office during school hours. Bring your
-                  student ID.
-                </p>
                 <div className="flex gap-3">
                   <Link
-                    href={backToSearchHref}
+                    href={`${BASE}/claim?item=${encodeURIComponent(
+                      String(itemId)
+                    )}&chat=1`}
                     className="inline-flex items-center justify-center rounded-lg bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99]"
+                  >
+                    Open Messages
+                  </Link>
+                  <Link
+                    href={backToSearchHref}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
                   >
                     ← Back to Search
                   </Link>
-                  <Link
-                    href={backToItemHref}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-                  >
-                    View Item
-                  </Link>
-                </div>
-                <div className="mt-3 text-xs text-green-800/80">
-                  Redirecting back to search in ~5 seconds…
                 </div>
               </section>
             )}
@@ -620,6 +676,17 @@ export default function ClaimPage() {
           .
         </p>
       </div>
+
+      {/* Chat Modal */}
+      {chatOpen && chatClaim && (
+        <ChatModal
+          open={chatOpen}
+          claim={chatClaim}
+          onClose={() => setChatOpen(false)}
+          meIsStaff={false}
+          currentUid={currentUid}
+        />
+      )}
     </main>
   );
 }
