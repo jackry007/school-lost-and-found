@@ -2,15 +2,33 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Item, Claim } from "@/lib/types";
+import { markClaimPickedUp } from "@/lib/claimsActions";
+import { logEvent } from "@/lib/audit";
 
 /* =========================================================
    Types / palette
    ======================================================= */
-type ItemStatusWidened = Item["status"] | "pending" | "rejected";
-type StatusFilter = "all" | "pending" | "listed" | "claimed" | "rejected";
+type ItemStatusWidened =
+  | Item["status"]
+  | "pending"
+  | "rejected"
+  | "on_hold"
+  | "claimed";
+
+type StatusFilter =
+  | "all"
+  | "pending"
+  | "approved"
+  | "on_hold"
+  | "claimed"
+  | "rejected"
+  | "needs_info"
+  | "expired"
+  | "completed";
 
 type ChatMessage = {
   id: number;
@@ -23,14 +41,25 @@ type ChatMessage = {
   seen_by_staff: boolean | null;
 };
 
-const CREEK_RED = "#b10015"; // deep scarlet
-const CREEK_NAVY = "#0f2741"; // dark navy
-const CREEK_SOFTR = "#fef2f3"; // soft red tint
-const CREEK_SOFTN = "#f1f5fb"; // soft navy tint
+type AuditRow = {
+  id: number;
+  at: string;
+  actor_uid: string | null;
+  action: string;
+  entity_type: "item" | "claim" | "message";
+  entity_id: number | null;
+  details: any;
+  user_agent?: string | null;
+};
+
+const CREEK_RED = "#b10015";
+const CREEK_NAVY = "#0f2741";
+const CREEK_SOFTR = "#fef2f3";
+const CREEK_SOFTN = "#f1f5fb";
 
 // ---------- Images (Supabase Storage) ----------
 const BUCKET = "item-photos";
-const CLAIM_BUCKET = "claim-photos"; // change if your proof photos live elsewhere
+const CLAIM_BUCKET = "claim-photos";
 
 const FALLBACK_THUMB =
   "data:image/svg+xml;utf8," +
@@ -45,13 +74,13 @@ const FALLBACK_THUMB =
 
 function publicUrlFrom(bucket: string, path?: string | null) {
   if (!path) return FALLBACK_THUMB;
-  if (/^https?:\/\//i.test(path)) return path; // already a URL
+  if (/^https?:\/\//i.test(path)) return path;
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data?.publicUrl || FALLBACK_THUMB;
 }
 
 /* =========================================================
-   Tiny Toast system (self-contained)
+   Tiny Toast system
    ======================================================= */
 type Toast = {
   id: number;
@@ -79,7 +108,7 @@ function useToasts() {
   };
   const remove = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
   const node = (
-    <div className="fixed right-3 top-3 z-[100] space-y-2">
+    <div className="fixed right-3 top-3 z-[120] space-y-2">
       {toasts.map((t) => (
         <div
           key={t.id}
@@ -112,7 +141,41 @@ function useToasts() {
 }
 
 /* =========================================================
-   Confirm Modal (no window.confirm)
+   Portal + Body Scroll Lock
+   ======================================================= */
+function Portal({ children }: { children: React.ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return ReactDOM.createPortal(children, document.body);
+}
+
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (!locked) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    html.style.overscrollBehavior = "none";
+
+    return () => {
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.width = "";
+      html.style.overscrollBehavior = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [locked]);
+}
+
+/* =========================================================
+   Confirm Modal (for item approve) — Portal + lock
    ======================================================= */
 function ConfirmModal({
   open,
@@ -133,7 +196,7 @@ function ConfirmModal({
   onCancel: () => void;
   busy?: boolean;
 }) {
-  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  useBodyScrollLock(open);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -146,41 +209,45 @@ function ConfirmModal({
   }, [open, onCancel, onConfirm]);
 
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-[95%] max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-          <div
-            className="px-4 py-3 text-white"
-            style={{
-              background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-            }}
-          >
-            <h3 className="text-base font-semibold">{title}</h3>
-          </div>
-          <div className="p-4 text-sm text-gray-800">{children}</div>
-          <div className="flex justify-end gap-2 p-4 pt-0">
-            <button
-              onClick={onCancel}
-              disabled={busy}
-              className="rounded-md border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-            >
-              {cancelLabel}
-            </button>
-            <button
-              ref={confirmRef}
-              onClick={onConfirm}
-              disabled={busy}
-              className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-md disabled:opacity-60"
-              style={{ backgroundColor: CREEK_RED }}
-            >
-              {busy ? "Working…" : confirmLabel}
-            </button>
+    <Portal>
+      <div className="fixed inset-0 z-[100]">
+        <div className="fixed inset-0 bg-black/40" onClick={onCancel} />
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="w-[95%] max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div
+                className="px-4 py-3 text-white"
+                style={{
+                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+                }}
+              >
+                <h3 className="text-base font-semibold">{title}</h3>
+              </div>
+              <div className="p-4 text-sm text-gray-800">{children}</div>
+              <div className="flex justify-end gap-2 p-4 pt-0">
+                <button
+                  onClick={onCancel}
+                  disabled={busy}
+                  className="rounded-md border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  {cancelLabel}
+                </button>
+                <button
+                  onClick={onConfirm}
+                  disabled={busy}
+                  className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-md disabled:opacity-60"
+                  style={{ backgroundColor: CREEK_RED }}
+                >
+                  {busy ? "Working…" : confirmLabel}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 
@@ -222,50 +289,23 @@ export default function AdminPage() {
     setPhotoOpen(true);
   }
 
-  // ----- Schedule modal (only schedule_at) -----
+  // ----- Schedule modal -----
   const [schedOpen, setSchedOpen] = useState(false);
   const [schedClaim, setSchedClaim] = useState<Claim | null>(null);
-  const [schedAt, setSchedAt] = useState(""); // HTML datetime-local
+  const [schedAt, setSchedAt] = useState("");
   const [schedBusy, setSchedBusy] = useState(false);
 
   // ----- Chat modal -----
   const [chatOpen, setChatOpen] = useState(false);
   const [chatClaim, setChatClaim] = useState<Claim | null>(null);
 
-  function openSchedule(c: Claim) {
-    setSchedClaim(c);
-    const at = (c as any).schedule_at as string | null | undefined;
-    setSchedAt(at ? new Date(at).toISOString().slice(0, 16) : "");
-    setSchedOpen(true);
-  }
+  // ----- Mark Returned / Picked Up -----
+  const [pickupCode, setPickupCode] = useState("");
+  const [markBusy, setMarkBusy] = useState(false);
 
-  function openChat(c: Claim) {
-    setChatClaim(c);
-    setChatOpen(true);
-  }
-
-  async function saveSchedule() {
-    if (!schedClaim) return;
-    setSchedBusy(true);
-    const iso = schedAt ? new Date(schedAt).toISOString() : null;
-
-    const { error } = await supabase
-      .from("claims")
-      .update({ schedule_at: iso })
-      .eq("id", schedClaim.id);
-
-    setSchedBusy(false);
-    if (error) return addToast(`Error scheduling: ${error.message}`);
-
-    addToast(
-      iso
-        ? `Pickup scheduled for claim #${schedClaim.id}`
-        : `Pickup cleared for claim #${schedClaim.id}`
-    );
-    setSchedOpen(false);
-    setSchedClaim(null);
-    load(); // refresh list to show chip
-  }
+  // ----- Activity Log -----
+  const [logRows, setLogRows] = useState<AuditRow[]>([]);
+  const [logLoading, setLogLoading] = useState(true);
 
   /* ---------------- Auth + load ---------------- */
   const load = async () => {
@@ -307,9 +347,59 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  async function loadLog() {
+    setLogLoading(true);
+    const { data, error } = await supabase
+      .from("audit_log")
+      .select("*")
+      .order("at", { ascending: false })
+      .limit(200);
+    if (!error && data) setLogRows(data as AuditRow[]);
+    setLogLoading(false);
+  }
+
   useEffect(() => {
     load();
+    loadLog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // realtime refresh when claims change
+  useEffect(() => {
+    const ch = supabase
+      .channel("claims-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "claims" },
+        () => {
+          load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // realtime activity log
+  useEffect(() => {
+    const ch = supabase
+      .channel("audit-log-rt")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "audit_log" },
+        (payload) => {
+          setLogRows((rows) =>
+            [payload.new as AuditRow, ...rows].slice(0, 200)
+          );
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, []);
 
   // build/refresh thumbnail map whenever items change
@@ -338,7 +428,7 @@ export default function AdminPage() {
     );
   }
 
-  /* ---------------- Actions ---------------- */
+  /* ---------------- Actions: auth ---------------- */
   const signOut = async () => {
     await supabase.auth.signOut();
     setRole(null);
@@ -347,43 +437,24 @@ export default function AdminPage() {
     router.replace("/");
   };
 
-  const updateClaim = async (id: number, status: "approved" | "rejected") => {
-    const { error } = await supabase
-      .from("claims")
-      .update({ status })
-      .eq("id", id);
-    if (error) return addToast(`Claim update failed: ${error.message}`);
-    addToast(`Claim #${id} → ${status}`);
-    load();
+  // Opens the Edit modal prefilled with the item's current fields
+  const openEdit = (it: Item) => {
+    setEditItem(it);
+    setEditForm({
+      title: it.title ?? "",
+      category: it.category ?? "",
+      ...({ location: (it as any).location ?? "" } as any),
+      description: it.description ?? "",
+    });
+    setEditOpen(true);
   };
 
-  const markItemClaimed = async (id: number) => {
-    const { error } = await supabase
-      .from("items")
-      .update({ status: "claimed" })
-      .eq("id", id);
-    if (error) return addToast(`Error: ${error.message}`);
-    moveItemLocally(id, "claimed");
-    addToast(`Item #${id} marked claimed.`);
-  };
-
-  const restoreToListed = async (id: number) => {
-    const { error } = await supabase
-      .from("items")
-      .update({ status: "listed" })
-      .eq("id", id);
-    if (error) return addToast(`Error: ${error.message}`);
-    moveItemLocally(id, "listed");
-    addToast(`Item #${id} restored to Listed.`);
-  };
-
-  // OPEN modal for approve/reject
+  /* ---------------- Actions: ITEMS (moderation) ---------------- */
   const askApprove = (it: Item) => {
     setApproveTarget(it);
     setApproveOpen(true);
   };
 
-  // Approve & List with optimistic + undo
   const confirmApprove = async () => {
     if (!approveTarget) return;
     const id = approveTarget.id;
@@ -394,13 +465,18 @@ export default function AdminPage() {
     setApproveOpen(false);
     setApproveBusy(false);
 
-    // show undo toast (5s)
+    // show undo toast
     addToast(`Approved: “${approveTarget.title}”`, {
       actionLabel: "Undo (5s)",
       ttl: 5000,
       onAction: async () => {
         await supabase.from("items").update({ status: "pending" }).eq("id", id);
         moveItemLocally(id, "pending");
+        await logEvent("item_updated", "item", id, {
+          prev_status: "listed",
+          next_status: "pending",
+          via: "undo",
+        });
       },
     });
 
@@ -410,14 +486,13 @@ export default function AdminPage() {
       .update({ status: "listed" })
       .eq("id", id);
     if (error) {
-      // revert optimistic on error
       moveItemLocally(id, "pending");
       addToast(`Error listing item: ${error.message}`);
-      return;
+    } else {
+      await logEvent("item_listed", "item", id);
     }
   };
 
-  // Reject
   const updateItemStatus = async (id: number, status: "rejected") => {
     const { error } = await supabase
       .from("items")
@@ -426,46 +501,266 @@ export default function AdminPage() {
     if (error) return addToast(`Error: ${error.message}`);
     moveItemLocally(id, "rejected");
     addToast(`Item #${id} → rejected`);
+    await logEvent("item_rejected", "item", id);
   };
 
-  // Inline Edit
-  const openEdit = (it: Item) => {
-    setEditItem(it);
-    setEditForm({
-      title: it.title,
-      category: it.category,
-      // @ts-expect-error your table has location
-      location: (it as any).location ?? null,
-      description: it.description,
-    });
-    setEditOpen(true);
-  };
-
-  const saveEdit = async () => {
-    if (!editItem) return;
-    const payload: Partial<Item> = {
-      title: editForm.title ?? editItem.title,
-      category: editForm.category ?? editItem.category,
-      // @ts-expect-error ensure your table column is "location"
-      location:
-        (editForm as any).location ?? (editItem as any).location ?? null,
-      description: editForm.description ?? editItem.description,
-    };
+  const restoreToListed = async (id: number) => {
     const { error } = await supabase
       .from("items")
-      .update(payload)
-      .eq("id", editItem.id);
-    if (error) return addToast(`Save failed: ${error.message}`);
-    setEditOpen(false);
-    setEditItem(null);
-    setEditForm({});
-    setItems((prev) =>
-      prev.map((it) =>
-        it.id === editItem.id ? ({ ...it, ...payload } as Item) : it
-      )
-    );
-    addToast("Changes saved.");
+      .update({ status: "listed" })
+      .eq("id", id);
+    if (error) return addToast(`Error: ${error.message}`);
+    moveItemLocally(id, "listed");
+    addToast(`Item #${id} restored to Listed.`);
+    await logEvent("item_released_hold", "item", id);
   };
+
+  /* ---------------- Actions: CLAIMS (RPCs) ---------------- */
+
+  async function approveClaimRPC(claimId: number, adminUid: string) {
+    const { data, error } = await supabase.rpc("approve_claim", {
+      p_claim_id: claimId,
+      p_admin: adminUid,
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : undefined;
+  }
+
+  async function requestInfoRPC(
+    claimId: number,
+    adminUid: string,
+    msg?: string
+  ) {
+    const { error } = await supabase.rpc("request_info_claim", {
+      p_claim_id: claimId,
+      p_admin: adminUid,
+      p_msg: msg ?? null,
+    });
+    if (error) throw error;
+  }
+
+  async function rejectClaimRPC(
+    claimId: number,
+    adminUid: string,
+    reason?: string
+  ) {
+    const { error } = await supabase.rpc("reject_claim", {
+      p_claim_id: claimId,
+      p_admin: adminUid,
+      p_reason: reason ?? null,
+    });
+    if (error) throw error;
+  }
+
+  async function markReturnedRPC(code: string, adminUid: string) {
+    const { error } = await supabase.rpc("mark_claim_returned", {
+      p_pickup_code: code,
+      p_admin: adminUid,
+    });
+    if (error) throw error;
+  }
+
+  // small helper to get uid
+  async function getUid() {
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id as string | undefined;
+  }
+
+  async function getLatestClaimForItem(itemId: number) {
+    const { data, error } = await supabase
+      .from("claims")
+      .select("id, item_id, status, pickup_code, created_at")
+      .eq("item_id", itemId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as {
+      id: number;
+      item_id: number;
+      status: string | null;
+      pickup_code: string | null;
+    } | null;
+  }
+
+  // Buttons for each claim
+  async function onApproveClaim(c: Claim) {
+    const uid = await getUid();
+    if (!uid) return addToast("Not signed in.");
+    try {
+      const info = await approveClaimRPC(c.id, uid);
+      if (info?.pickup_code) {
+        addToast(`Claim #${c.id} approved. Code: ${info.pickup_code}`);
+        try {
+          await navigator.clipboard.writeText(info.pickup_code);
+          addToast("Pickup code copied.");
+        } catch {}
+      } else {
+        addToast(`Claim #${c.id} approved.`);
+      }
+      await logEvent("approve_claim", "claim", c.id, { item_id: c.item_id });
+      load();
+    } catch (e: any) {
+      addToast(`Approve failed: ${e.message || e}`);
+    }
+  }
+
+  async function onAskInfo(c: Claim) {
+    const uid = await getUid();
+    if (!uid) return addToast("Not signed in.");
+    try {
+      await requestInfoRPC(c.id, uid, "");
+      addToast(`Asked for more info on Claim #${c.id}`);
+      await logEvent("request_info", "claim", c.id);
+      load();
+    } catch (e: any) {
+      addToast(`Request failed: ${e.message || e}`);
+    }
+  }
+
+  async function onRejectClaim(c: Claim) {
+    const uid = await getUid();
+    if (!uid) return addToast("Not signed in.");
+    try {
+      await rejectClaimRPC(c.id, uid, "Not enough proof to verify ownership.");
+      addToast(`Claim #${c.id} rejected.`);
+      await logEvent("reject_claim", "claim", c.id);
+      load();
+    } catch (e: any) {
+      addToast(`Reject failed: ${e.message || e}`);
+    }
+  }
+
+  async function onMarkReturnedSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const uid = await getUid();
+    if (!uid) return addToast("Not signed in.");
+    const code = pickupCode.trim().toUpperCase();
+    if (!code) return;
+    setMarkBusy(true);
+    try {
+      await markReturnedRPC(code, uid);
+      addToast("Item marked returned.");
+      await logEvent("mark_picked_up", "claim", null, { pickup_code: code });
+      setPickupCode("");
+      load();
+    } catch (e: any) {
+      addToast(e.message ?? "Invalid or already used code.");
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+
+  // NEW: helper to auto-get the on_hold claim (to fetch pickup_code)
+  async function getOnHoldClaimForItem(itemId: number) {
+    const { data, error } = await supabase
+      .from("claims")
+      .select("id, item_id, status, pickup_code")
+      .eq("item_id", itemId)
+      .eq("status", "on_hold")
+      .limit(1)
+      .single();
+    if (error) throw error;
+    return data as {
+      id: number;
+      item_id: number;
+      status: string;
+      pickup_code: string | null;
+    };
+  }
+
+  // One-click “Mark Picked Up” that auto-fetches latest claim, then RPC
+  async function onQuickPickUp(itemId: number) {
+    const uid = await getUid();
+    if (!uid) return addToast("Not signed in.");
+    setMarkBusy(true);
+    try {
+      const claim = await getLatestClaimForItem(itemId);
+      if (!claim?.id) throw new Error("No claim found for this item.");
+
+      await markClaimPickedUp(claim.id, uid);
+      addToast(`Claim #${claim.id} marked picked up ✅`);
+      await logEvent("mark_picked_up", "claim", claim.id, { item_id: itemId });
+      await load();
+    } catch (err: any) {
+      addToast(err?.message ?? "Failed to mark picked up");
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+
+  // Optional: keep your manual desk’s button
+  async function onMarkPickedUp() {
+    const code = pickupCode.trim().toUpperCase();
+    if (!code) return;
+    const uid = await getUid();
+    if (!uid) return addToast("Not signed in.");
+
+    setMarkBusy(true);
+    try {
+      const { error } = await supabase.rpc("mark_claim_returned", {
+        p_pickup_code: code,
+        p_admin: uid,
+      });
+      if (error) throw error;
+
+      addToast("Item marked as picked up!");
+      await logEvent("mark_picked_up", "claim", null, { pickup_code: code });
+      setPickupCode("");
+      load();
+    } catch (err: any) {
+      addToast(err?.message ?? "Failed to mark as picked up");
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+
+  /* ---------------- Schedule + Chat helpers ---------------- */
+  function openSchedule(c: Claim) {
+    setSchedClaim(c);
+    const at = (c as any).schedule_at as string | null | undefined;
+    setSchedAt(at ? new Date(at).toISOString().slice(0, 16) : "");
+    setSchedOpen(true);
+  }
+
+  function openChat(c: Claim) {
+    setChatClaim(c);
+    setChatOpen(true);
+  }
+
+  async function saveSchedule() {
+    if (!schedClaim) return;
+    setSchedBusy(true);
+    const iso = schedAt ? new Date(schedAt).toISOString() : null;
+
+    const { error } = await supabase
+      .from("claims")
+      .update({ schedule_at: iso })
+      .eq("id", schedClaim.id);
+
+    setSchedBusy(false);
+    if (error) return addToast(`Error scheduling: ${error.message}`);
+
+    addToast(
+      iso
+        ? `Pickup scheduled for claim #${schedClaim.id}`
+        : `Pickup cleared for claim #${schedClaim.id}`
+    );
+
+    await logEvent(
+      iso ? "schedule_set" : "schedule_cleared",
+      "claim",
+      schedClaim.id,
+      {
+        at: iso,
+      }
+    );
+
+    setSchedOpen(false);
+    setSchedClaim(null);
+    load();
+  }
 
   /* ---------------- Derived ---------------- */
   const pendingItems = items.filter(
@@ -473,7 +768,6 @@ export default function AdminPage() {
   );
   const pendingClaims = claims.filter((c) => c.status === "pending");
 
-  // Build thumbs per claim: item photo + proof photos
   const claimThumbs = useMemo(() => {
     const map: Record<number, { itemThumb: string; proofs: string[] }> = {};
     for (const c of claims) {
@@ -483,19 +777,19 @@ export default function AdminPage() {
         : FALLBACK_THUMB;
 
       let proofs: string[] = [];
-      if (c.proof && c.proof.trim()) {
+      if ((c as any).proof && String((c as any).proof).trim()) {
+        const raw = String((c as any).proof);
         try {
-          const parsed = JSON.parse(c.proof);
+          const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
             proofs = parsed.map((p: string) => publicUrlFrom(CLAIM_BUCKET, p));
           } else {
-            proofs = [publicUrlFrom(CLAIM_BUCKET, c.proof)];
+            proofs = [publicUrlFrom(CLAIM_BUCKET, raw)];
           }
         } catch {
-          proofs = [publicUrlFrom(CLAIM_BUCKET, c.proof)];
+          proofs = [publicUrlFrom(CLAIM_BUCKET, raw)];
         }
       }
-
       map[c.id] = { itemThumb, proofs };
     }
     return map;
@@ -519,10 +813,10 @@ export default function AdminPage() {
     totalItems,
     totalClaims,
     listedCount,
-    claimedCount,
+    onHoldCount,
+    returnedCount,
     pendingCount,
     rejectedCount,
-    returnRatePct,
     topCats,
     topLocs,
   } = useMemo(() => {
@@ -530,7 +824,8 @@ export default function AdminPage() {
     const totalClaims = claims.length;
 
     let listed = 0,
-      claimed = 0,
+      on_hold = 0,
+      returned = 0,
       pending = 0,
       rejected = 0;
 
@@ -543,7 +838,7 @@ export default function AdminPage() {
     for (const it of items) {
       const s = it.status as ItemStatusWidened;
       if (s === "listed") listed++;
-      else if (s === "claimed") claimed++;
+      else if (s === "on_hold") on_hold++;
       else if (s === "pending") pending++;
       else if (s === "rejected") rejected++;
 
@@ -557,9 +852,6 @@ export default function AdminPage() {
       }
     }
 
-    const denom = listed + claimed;
-    const returnRatePct = denom ? Math.round((claimed / denom) * 100) : 0;
-
     const topCats = Array.from(cat30.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
@@ -571,10 +863,10 @@ export default function AdminPage() {
       totalItems,
       totalClaims,
       listedCount: listed,
-      claimedCount: claimed,
+      onHoldCount: on_hold,
+      returnedCount: returned,
       pendingCount: pending,
       rejectedCount: rejected,
-      returnRatePct,
       topCats,
       topLocs,
     };
@@ -612,6 +904,31 @@ export default function AdminPage() {
       <Header role={role} onSignOut={signOut} />
 
       <main className="mx-auto max-w-6xl space-y-10 p-6">
+        {/* Quick Actions Row */}
+        <Card className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-gray-700">
+              <span className="font-medium">Pickup Desk:</span> Enter a pickup
+              code to mark a claim as picked up.
+            </div>
+            <form className="flex gap-2" onSubmit={onMarkReturnedSubmit}>
+              <input
+                value={pickupCode}
+                onChange={(e) => setPickupCode(e.target.value.toUpperCase())}
+                placeholder="Pickup code"
+                className="w-40 rounded-full border px-3 py-1.5 text-sm outline-none focus:ring-2"
+              />
+              <Btn
+                tone="success"
+                onClick={onMarkPickedUp}
+                disabled={markBusy || pickupCode.trim().length < 4}
+              >
+                {markBusy ? "Marking…" : "Mark Picked Up"}
+              </Btn>
+            </form>
+          </div>
+        </Card>
+
         {/* Analytics */}
         <section>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -626,17 +943,12 @@ export default function AdminPage() {
               tint={CREEK_SOFTR}
             />
             <StatCard label="Listed" value={listedCount} tint="#eef7ff" />
-            <StatCard label="Claimed" value={claimedCount} tint="#eefcf3" />
+            <StatCard label="On Hold" value={onHoldCount} tint="#fff7ee" />
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             <StatCard label="Pending" value={pendingCount} tint="#fff6e8" />
             <StatCard label="Rejected" value={rejectedCount} tint="#fdeff0" />
-            <StatCard
-              label="Return rate"
-              value={`${returnRatePct}%`}
-              tint="#f5f7ff"
-            />
             <Card className="p-4">
               <div className="mb-2 text-xs text-gray-500">
                 Top categories (30d)
@@ -671,6 +983,54 @@ export default function AdminPage() {
               </ul>
             ) : (
               <div className="text-sm text-gray-600">—</div>
+            )}
+          </Card>
+        </section>
+
+        {/* Activity Log */}
+        <section className="space-y-3">
+          <SectionHeading>Activity Log</SectionHeading>
+          <Card>
+            {logLoading ? (
+              <div className="p-4 text-sm text-gray-500">Loading…</div>
+            ) : logRows.length === 0 ? (
+              <div className="p-6 text-center text-sm text-gray-600">
+                No activity yet.
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {logRows.map((r) => (
+                  <li
+                    key={r.id}
+                    className="p-3 flex items-start justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-800">
+                          {r.entity_type}
+                          {r.entity_id ? `#${r.entity_id}` : ""}
+                        </span>
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-blue-800">
+                          {r.action}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-sm text-gray-800 break-words">
+                        {Object.keys(r.details ?? {}).length
+                          ? JSON.stringify(r.details ?? {}, null, 0)
+                          : "—"}
+                      </div>
+                      {r.actor_uid && (
+                        <div className="mt-1 text-[11px] text-gray-500">
+                          by {r.actor_uid}
+                        </div>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-xs text-gray-500">
+                      {new Date(r.at).toLocaleString()}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
         </section>
@@ -742,8 +1102,9 @@ export default function AdminPage() {
                       }
                       meta={
                         <>
-                          {c.claimant_name} ({c.claimant_email})
-                          {c.proof && (
+                          {(c as any).claimant_name} (
+                          {(c as any).claimant_email})
+                          {(c as any).proof && (
                             <>
                               {" "}
                               ·{" "}
@@ -759,7 +1120,6 @@ export default function AdminPage() {
 
                   {/* Right: actions */}
                   <div className="flex shrink-0 items-center gap-2">
-                    {/* Proof viewer */}
                     {t?.proofs?.length > 0 && (
                       <button
                         className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
@@ -772,26 +1132,21 @@ export default function AdminPage() {
                       </button>
                     )}
 
-                    {/* Message */}
                     <Btn tone="ghost" onClick={() => openChat(c)}>
                       Message
                     </Btn>
 
-                    {/* Schedule / Reschedule */}
                     <Btn tone="ghost" onClick={() => openSchedule(c)}>
                       {schedChip ? "Reschedule" : "Schedule"}
                     </Btn>
 
-                    <Btn
-                      tone="primary"
-                      onClick={() => updateClaim(c.id, "approved")}
-                    >
+                    <Btn tone="primary" onClick={() => onApproveClaim(c)}>
                       Approve
                     </Btn>
-                    <Btn
-                      tone="danger"
-                      onClick={() => updateClaim(c.id, "rejected")}
-                    >
+                    <Btn tone="ghost" onClick={() => onAskInfo(c)}>
+                      Ask Info
+                    </Btn>
+                    <Btn tone="danger" onClick={() => onRejectClaim(c)}>
                       Reject
                     </Btn>
                   </div>
@@ -810,6 +1165,7 @@ export default function AdminPage() {
                   "all",
                   "pending",
                   "listed",
+                  "on_hold",
                   "claimed",
                   "rejected",
                 ] as StatusFilter[]
@@ -819,7 +1175,9 @@ export default function AdminPage() {
                   active={statusFilter === sf}
                   onClick={() => setStatusFilter(sf)}
                 >
-                  {sf[0].toUpperCase() + sf.slice(1)}
+                  {sf
+                    .replace("_", " ")
+                    .replace(/\b\w/g, (m) => m.toUpperCase())}
                 </Pill>
               ))}
             </div>
@@ -876,29 +1234,37 @@ export default function AdminPage() {
                     )}
                     {s === "listed" && (
                       <>
-                        <Btn
-                          tone="primary"
-                          onClick={() => markItemClaimed(it.id)}
-                        >
-                          Mark Claimed
-                        </Btn>
                         <Btn tone="ghost" onClick={() => openEdit(it)}>
                           Edit
                         </Btn>
                       </>
                     )}
-                    {s === "claimed" && (
+                    {s === "on_hold" && (
                       <>
-                        <Btn tone="ghost" onClick={() => openEdit(it)}>
-                          Edit
+                        <span className="mr-1 text-xs text-gray-500">
+                          Awaiting pickup…
+                        </span>
+                        {/* NEW quick pickup */}
+                        <Btn
+                          tone="success"
+                          onClick={() => onQuickPickUp(it.id)}
+                          disabled={markBusy}
+                        >
+                          {markBusy ? "Working…" : "Mark Picked Up"}
                         </Btn>
                         <Btn
                           tone="secondary"
                           onClick={() => restoreToListed(it.id)}
+                          disabled={markBusy}
                         >
-                          Restore to Listed
+                          Release Hold
                         </Btn>
                       </>
+                    )}
+                    {s === "claimed" && (
+                      <span className="text-xs text-emerald-700">
+                        Picked Up 🎉
+                      </span>
                     )}
                     {s === "rejected" && (
                       <Btn
@@ -971,7 +1337,42 @@ export default function AdminPage() {
             <Btn tone="ghost" onClick={() => setEditOpen(false)}>
               Cancel
             </Btn>
-            <Btn tone="primary" onClick={saveEdit}>
+            <Btn
+              tone="primary"
+              onClick={async () => {
+                if (!editItem) return;
+                const payload: Partial<Item> = {
+                  title: editForm.title ?? editItem.title,
+                  category: editForm.category ?? editItem.category,
+                  // @ts-expect-error ensure your table column is "location"
+                  location:
+                    (editForm as any).location ??
+                    (editItem as any).location ??
+                    null,
+                  description: editForm.description ?? editItem.description,
+                };
+                const { error } = await supabase
+                  .from("items")
+                  .update(payload)
+                  .eq("id", editItem.id);
+                if (error) return addToast(`Save failed: ${error.message}`);
+                setEditOpen(false);
+                setEditItem(null);
+                setEditForm({});
+                setItems((prev) =>
+                  prev.map((it) =>
+                    it.id === editItem.id ? ({ ...it, ...payload } as Item) : it
+                  )
+                );
+                addToast("Changes saved.");
+                await logEvent(
+                  "item_updated",
+                  "item",
+                  editItem.id,
+                  payload as any
+                );
+              }}
+            >
               Save changes
             </Btn>
           </div>
@@ -996,7 +1397,7 @@ export default function AdminPage() {
         </Modal>
       )}
 
-      {/* Schedule Modal (only date/time) */}
+      {/* Schedule Modal */}
       {schedOpen && (
         <Modal
           title={`Schedule Pickup — Claim #${schedClaim?.id}`}
@@ -1024,7 +1425,7 @@ export default function AdminPage() {
         </Modal>
       )}
 
-      {/* Approve Modal */}
+      {/* Approve Item Modal */}
       <ConfirmModal
         open={approveOpen}
         busy={approveBusy}
@@ -1062,6 +1463,21 @@ export default function AdminPage() {
 
 /* ===================== Pretty UI bits ===================== */
 
+function Labeled({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="grid gap-1 text-sm">
+      <span className="text-gray-700">{label}</span>
+      {children}
+    </label>
+  );
+}
+
 function Header({
   role,
   onSignOut,
@@ -1093,7 +1509,7 @@ function Header({
           )}
           <button
             onClick={onSignOut}
-            className="rounded-full bg-white px-3 py-1.5 text-[13px] font-medium shadow hover:bg-white/90"
+            className="rounded-full bg-white px-3 py-1.5 text-[13px] font-medium shadow hover:bg白/90"
           >
             Sign out
           </button>
@@ -1237,29 +1653,78 @@ function Btn({
   children,
   onClick,
   tone = "primary",
+  disabled,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
-  tone?: "primary" | "secondary" | "danger" | "ghost";
+  tone?: "primary" | "secondary" | "danger" | "ghost" | "success";
+  disabled?: boolean;
 }) {
-  const styles: Record<string, string> = {
-    primary: `text-white shadow-sm`,
-    secondary: `text-[${CREEK_NAVY}] bg-[${CREEK_SOFTN}] border border-[${CREEK_NAVY}]`,
-    danger: `text-white shadow-sm`,
-    ghost: `text-gray-700 border border-gray-200 bg-white hover:bg-gray-50`,
-  };
-  const background =
-    tone === "primary"
-      ? `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`
-      : tone === "danger"
-      ? `linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)`
-      : "transparent";
-
+  const base = "rounded-full px-3 py-1.5 text-sm";
+  if (tone === "primary") {
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} text-white shadow-sm disabled:opacity-60`}
+        style={{
+          background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+  if (tone === "danger") {
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} text-white shadow-sm disabled:opacity-60`}
+        style={{
+          background: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+  if (tone === "success") {
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} text-white shadow-sm disabled:opacity-60`}
+        style={{
+          background: "linear-gradient(135deg, #10b981 0%, #065f46 100%)",
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+  if (tone === "secondary") {
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} border text-[13px] disabled:opacity-60`}
+        style={{
+          color: CREEK_NAVY,
+          borderColor: CREEK_NAVY,
+          background: CREEK_SOFTN,
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+  // ghost
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-sm ${styles[tone]}`}
-      style={{ background }}
+      disabled={disabled}
+      className={`${base} text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60`}
     >
       {children}
     </button>
@@ -1268,16 +1733,28 @@ function Btn({
 
 function StatusBadge({ status }: { status: ItemStatusWidened }) {
   const look =
-    status === "pending"
+    status === "claimed"
+      ? "bg-emerald-100 text-emerald-800"
+      : status === "on_hold"
       ? "bg-amber-100 text-amber-800"
       : status === "listed"
-      ? "bg-blue-100 text-blue-800"
-      : status === "claimed"
-      ? "bg-emerald-100 text-emerald-800"
-      : "bg-rose-100 text-rose-800";
+      ? "bg-green-100 text-green-800"
+      : status === "pending"
+      ? "bg-amber-100 text-amber-800"
+      : status === "rejected"
+      ? "bg-rose-100 text-rose-800"
+      : "bg-gray-100 text-gray-800";
+
+  const label =
+    status === "claimed"
+      ? "Picked Up"
+      : status === "on_hold"
+      ? "On Hold"
+      : status.charAt(0).toUpperCase() + status.slice(1);
+
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] ${look}`}>
-      {status}
+      {label}
     </span>
   );
 }
@@ -1291,46 +1768,36 @@ function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  useBodyScrollLock(true);
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-[95%] max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl">
-          <div
-            className="rounded-t-2xl px-4 py-3 text-white"
-            style={{
-              background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold">{title}</h3>
-              <button
-                className="text-sm text-white/90 hover:text-white"
-                onClick={onClose}
+    <Portal>
+      <div className="fixed inset-0 z-[100]">
+        <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="w-[95%] max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div
+                className="rounded-t-2xl px-4 py-3 text-white"
+                style={{
+                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+                }}
               >
-                Close
-              </button>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold">{title}</h3>
+                  <button
+                    className="text-sm text-white/90 hover:text-white"
+                    onClick={onClose}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="p-4">{children}</div>
             </div>
           </div>
-          <div className="p-4">{children}</div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Labeled({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1 text-sm">
-      <span className="text-gray-700">{label}</span>
-      {children}
-    </label>
+    </Portal>
   );
 }
 
@@ -1350,7 +1817,7 @@ function Thumb({ src, alt }: { src?: string; alt?: string }) {
 }
 
 /* =========================================================
-   Chat Modal (per-claim chat)
+   Chat Modal (per-claim chat) — Portal + lock
    ======================================================= */
 function ChatModal({
   claim,
@@ -1361,6 +1828,8 @@ function ChatModal({
   meIsStaff: boolean;
   onClose: () => void;
 }) {
+  useBodyScrollLock(true);
+
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1405,7 +1874,6 @@ function ChatModal({
         },
         (payload) => {
           setMsgs((m) => [...m, payload.new as ChatMessage]);
-          // auto-mark seen when staff has it open
           if (meIsStaff) {
             const row = payload.new as ChatMessage;
             if (row.sender_uid !== myUid) {
@@ -1434,7 +1902,6 @@ function ChatModal({
     if (!text || !myUid) return;
     setBusy(true);
 
-    // optimistic add
     const optimistic: ChatMessage = {
       id: Date.now(),
       claim_id: claim.id,
@@ -1448,22 +1915,32 @@ function ChatModal({
     setMsgs((m) => [...m, optimistic]);
     setInput("");
 
-    // ⬇️ This is the insert you asked about
-    const { error } = await supabase.from("claim_messages").insert({
-      claim_id: claim.id,
-      sender_uid: myUid,
-      sender_role: meIsStaff ? "staff" : "claimant", // <-- change here
-      body: text,
-      seen_by_claimant: meIsStaff ? false : true,
-      seen_by_staff: meIsStaff ? true : false,
-    });
+    const { data, error } = await supabase
+      .from("claim_messages")
+      .insert({
+        claim_id: claim.id,
+        sender_uid: myUid,
+        sender_role: meIsStaff ? "staff" : "claimant",
+        body: text,
+        seen_by_claimant: meIsStaff ? false : true,
+        seen_by_staff: meIsStaff ? true : false,
+      })
+      .select("id")
+      .single();
 
     if (error) {
-      // rollback optimistic (remove last optimistic by id)
       setMsgs((m) => m.filter((x) => x.id !== optimistic.id));
       alert(`Send failed: ${error.message}`);
-      setInput(text); // restore text
+      setInput(text);
+      setBusy(false);
+      return;
     }
+
+    // Audit: message sent
+    await logEvent("message_sent", "message", data?.id ?? null, {
+      claim_id: claim.id,
+    });
+
     setBusy(false);
   }
 
@@ -1475,92 +1952,99 @@ function ChatModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60]">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="flex w-[95%] max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-          <div
-            className="flex items-center justify-between px-4 py-3 text-white"
-            style={{
-              background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-            }}
-          >
-            <div className="text-sm">
-              <div className="font-semibold">Claim #{claim.id}</div>
-              <div className="text-white/80">
-                {claim.claimant_name} ({claim.claimant_email})
+    <Portal>
+      <div className="fixed inset-0 z-[100]">
+        <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="flex w-[95%] max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+              <div
+                className="flex items-center justify-between px-4 py-3 text-white"
+                style={{
+                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+                }}
+              >
+                <div className="text-sm">
+                  <div className="font-semibold">Claim #{claim.id}</div>
+                  <div className="text-white/80">
+                    {(claim as any).claimant_name} (
+                    {(claim as any).claimant_email})
+                  </div>
+                </div>
+                <button
+                  className="rounded px-3 py-1 text-sm text-white hover:bg-white/10"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
               </div>
-            </div>
-            <button
-              className="rounded px-3 py-1 text-sm text-white hover:bg-white/10"
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
 
-          {/* messages */}
-          <div
-            ref={listRef}
-            className="max-h-[60vh] min-h-[40vh] overflow-y-auto bg-gray-50 p-4"
-          >
-            {msgs.length === 0 && (
-              <div className="py-10 text-center text-sm text-gray-500">
-                No messages yet. Say hi 👋
-              </div>
-            )}
-            <div className="space-y-2">
-              {msgs.map((m) => {
-                const mine = m.sender_uid === myUid;
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex ${mine ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                        mine
-                          ? "bg-indigo-600 text-white"
-                          : "bg-white text-gray-800 border border-gray-200"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{m.body}</div>
+              {/* messages */}
+              <div
+                ref={listRef}
+                className="max-h-[60vh] min-h-[40vh] overflow-y-auto bg-gray-50 p-4"
+              >
+                {msgs.length === 0 && (
+                  <div className="py-10 text-center text-sm text-gray-500">
+                    No messages yet. Say hi 👋
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {msgs.map((m) => {
+                    const mine = m.sender_uid === myUid;
+                    return (
                       <div
-                        className={`mt-1 text-[10px] ${
-                          mine ? "text-white/80" : "text-gray-500"
+                        key={m.id}
+                        className={`flex ${
+                          mine ? "justify-end" : "justify-start"
                         }`}
                       >
-                        {new Date(m.created_at).toLocaleString()}
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                            mine
+                              ? "bg-indigo-600 text-white"
+                              : "bg-white text-gray-800 border border-gray-200"
+                          }`}
+                        >
+                          <div className="whitespace-pre-wrap">{m.body}</div>
+                          <div
+                            className={`mt-1 text-[10px] ${
+                              mine ? "text-white/80" : "text-gray-500"
+                            }`}
+                          >
+                            {new Date(m.created_at).toLocaleString()}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-          {/* composer */}
-          <div className="border-t border-gray-200 p-3">
-            <textarea
-              className="h-20 w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
-              placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              disabled={busy}
-            />
-            <div className="mt-2 flex items-center justify-end">
-              <button
-                onClick={send}
-                disabled={busy || input.trim().length === 0}
-                className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow disabled:opacity-60"
-              >
-                {busy ? "Sending…" : "Send"}
-              </button>
+              {/* composer */}
+              <div className="border-t border-gray-200 p-3">
+                <textarea
+                  className="h-20 w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
+                  placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  disabled={busy}
+                />
+                <div className="mt-2 flex items-center justify-end">
+                  <button
+                    onClick={send}
+                    disabled={busy || input.trim().length === 0}
+                    className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow disabled:opacity-60"
+                  >
+                    {busy ? "Sending…" : "Send"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 }
