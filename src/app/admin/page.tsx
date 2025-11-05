@@ -16,7 +16,7 @@ type ChatMessage = {
   id: number;
   claim_id: number;
   sender_uid: string;
-  sender_role: "staff" | "student";
+  sender_role: "staff" | "claimant";
   body: string;
   created_at: string;
   seen_by_claimant: boolean | null;
@@ -1439,7 +1439,7 @@ function ChatModal({
       id: Date.now(),
       claim_id: claim.id,
       sender_uid: myUid,
-      sender_role: meIsStaff ? "staff" : "student",
+      sender_role: meIsStaff ? "staff" : "claimant",
       body: text,
       created_at: new Date().toISOString(),
       seen_by_claimant: meIsStaff ? false : true,
@@ -1448,10 +1448,11 @@ function ChatModal({
     setMsgs((m) => [...m, optimistic]);
     setInput("");
 
+    // ⬇️ This is the insert you asked about
     const { error } = await supabase.from("claim_messages").insert({
       claim_id: claim.id,
       sender_uid: myUid,
-      sender_role: meIsStaff ? "staff" : "student",
+      sender_role: meIsStaff ? "staff" : "claimant", // <-- change here
       body: text,
       seen_by_claimant: meIsStaff ? false : true,
       seen_by_staff: meIsStaff ? true : false,
