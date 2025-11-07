@@ -2,23 +2,42 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Item, Claim } from "@/lib/types";
 import { markClaimPickedUp } from "@/lib/claimsActions";
 import { logEvent } from "@/lib/audit";
 
-/* =========================================================
-   Types / palette
-   ======================================================= */
-type ItemStatusWidened =
-  | Item["status"]
-  | "pending"
-  | "rejected"
-  | "on_hold"
-  | "claimed";
+// --- NEW modular imports ---
+import {
+  BUCKET,
+  CREEK_RED,
+  CREEK_NAVY,
+  CREEK_SOFTR,
+  CREEK_SOFTN,
+  FALLBACK_THUMB,
+} from "@/lib/admin/constants";
+import { useToasts } from "@/lib/admin/hooks/useToasts";
+import { useBodyScrollLock } from "@/lib/admin/hooks/useBodyScrollLock";
+import { Portal } from "@/lib/admin/Portal";
+import {
+  getUid,
+  approveClaimRPC,
+  requestInfoRPC,
+  rejectClaimRPC,
+  markReturnedRPC,
+  getLatestClaimForItem,
+} from "@/lib/admin/rpc";
+import {
+  computeClaimThumbs,
+  computeVisibleItems,
+  computeStats,
+  type ItemStatusWidened,
+} from "@/lib/admin/selectors";
 
+/* =========================================================
+   Types
+   ======================================================= */
 type StatusFilter =
   | "all"
   | "pending"
@@ -52,130 +71,8 @@ type AuditRow = {
   user_agent?: string | null;
 };
 
-const CREEK_RED = "#b10015";
-const CREEK_NAVY = "#0f2741";
-const CREEK_SOFTR = "#fef2f3";
-const CREEK_SOFTN = "#f1f5fb";
-
-// ---------- Images (Supabase Storage) ----------
-const BUCKET = "item-photos";
-const CLAIM_BUCKET = "claim-photos";
-
-const FALLBACK_THUMB =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='90'>
-      <rect width='100%' height='100%' fill='#f3f4f6'/>
-      <text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle'
-            font-family='system-ui, -apple-system, Segoe UI, Roboto, sans-serif'
-            font-size='12' fill='#9ca3af'>no image</text>
-    </svg>`
-  );
-
-function publicUrlFrom(bucket: string, path?: string | null) {
-  if (!path) return FALLBACK_THUMB;
-  if (/^https?:\/\//i.test(path)) return path;
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data?.publicUrl || FALLBACK_THUMB;
-}
-
 /* =========================================================
-   Tiny Toast system
-   ======================================================= */
-type Toast = {
-  id: number;
-  msg: string;
-  actionLabel?: string;
-  onAction?: () => void;
-};
-
-function useToasts() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const add = (
-    msg: string,
-    opts?: { actionLabel?: string; onAction?: () => void; ttl?: number }
-  ) => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts((t) => [
-      ...t,
-      { id, msg, actionLabel: opts?.actionLabel, onAction: opts?.onAction },
-    ]);
-    const ttl = opts?.ttl ?? 3000;
-    if (!opts?.onAction) {
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
-    }
-    return id;
-  };
-  const remove = (id: number) => setToasts((t) => t.filter((x) => x.id !== id));
-  const node = (
-    <div className="fixed right-3 top-3 z-[120] space-y-2">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className="flex items-center gap-3 rounded-md bg-gray-900/95 px-3 py-2 text-sm text-white shadow-lg"
-        >
-          <span>{t.msg}</span>
-          {t.actionLabel && (
-            <button
-              className="rounded border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10"
-              onClick={() => {
-                t.onAction?.();
-                remove(t.id);
-              }}
-            >
-              {t.actionLabel}
-            </button>
-          )}
-          <button
-            className="ml-1 rounded px-2 py-0.5 text-xs text-white/70 hover:bg-white/10"
-            onClick={() => remove(t.id)}
-            aria-label="Dismiss"
-          >
-            ✕
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-  return { add, remove, node };
-}
-
-/* =========================================================
-   Portal + Body Scroll Lock
-   ======================================================= */
-function Portal({ children }: { children: React.ReactNode }) {
-  if (typeof document === "undefined") return null;
-  return ReactDOM.createPortal(children, document.body);
-}
-
-function useBodyScrollLock(locked: boolean) {
-  useEffect(() => {
-    if (!locked) return;
-    const html = document.documentElement;
-    const body = document.body;
-    const scrollY = window.scrollY;
-
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    html.style.overscrollBehavior = "none";
-
-    return () => {
-      body.style.position = "";
-      body.style.top = "";
-      body.style.left = "";
-      body.style.right = "";
-      body.style.width = "";
-      html.style.overscrollBehavior = "";
-      window.scrollTo(0, scrollY);
-    };
-  }, [locked]);
-}
-
-/* =========================================================
-   Confirm Modal (for item approve) — Portal + lock
+   Confirm Modal (for item approve)
    ======================================================= */
 function ConfirmModal({
   open,
@@ -515,76 +412,7 @@ export default function AdminPage() {
     await logEvent("item_released_hold", "item", id);
   };
 
-  /* ---------------- Actions: CLAIMS (RPCs) ---------------- */
-
-  async function approveClaimRPC(claimId: number, adminUid: string) {
-    const { data, error } = await supabase.rpc("approve_claim", {
-      p_claim_id: claimId,
-      p_admin: adminUid,
-    });
-    if (error) throw error;
-    return Array.isArray(data) ? data[0] : undefined;
-  }
-
-  async function requestInfoRPC(
-    claimId: number,
-    adminUid: string,
-    msg?: string
-  ) {
-    const { error } = await supabase.rpc("request_info_claim", {
-      p_claim_id: claimId,
-      p_admin: adminUid,
-      p_msg: msg ?? null,
-    });
-    if (error) throw error;
-  }
-
-  async function rejectClaimRPC(
-    claimId: number,
-    adminUid: string,
-    reason?: string
-  ) {
-    const { error } = await supabase.rpc("reject_claim", {
-      p_claim_id: claimId,
-      p_admin: adminUid,
-      p_reason: reason ?? null,
-    });
-    if (error) throw error;
-  }
-
-  async function markReturnedRPC(code: string, adminUid: string) {
-    const { error } = await supabase.rpc("mark_claim_returned", {
-      p_pickup_code: code,
-      p_admin: adminUid,
-    });
-    if (error) throw error;
-  }
-
-  // small helper to get uid
-  async function getUid() {
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id as string | undefined;
-  }
-
-  async function getLatestClaimForItem(itemId: number) {
-    const { data, error } = await supabase
-      .from("claims")
-      .select("id, item_id, status, pickup_code, created_at")
-      .eq("item_id", itemId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data as {
-      id: number;
-      item_id: number;
-      status: string | null;
-      pickup_code: string | null;
-    } | null;
-  }
-
-  // Buttons for each claim
+  /* ---------------- Actions: CLAIMS ---------------- */
   async function onApproveClaim(c: Claim) {
     const uid = await getUid();
     if (!uid) return addToast("Not signed in.");
@@ -652,25 +480,7 @@ export default function AdminPage() {
     }
   }
 
-  // NEW: helper to auto-get the on_hold claim (to fetch pickup_code)
-  async function getOnHoldClaimForItem(itemId: number) {
-    const { data, error } = await supabase
-      .from("claims")
-      .select("id, item_id, status, pickup_code")
-      .eq("item_id", itemId)
-      .eq("status", "on_hold")
-      .limit(1)
-      .single();
-    if (error) throw error;
-    return data as {
-      id: number;
-      item_id: number;
-      status: string;
-      pickup_code: string | null;
-    };
-  }
-
-  // One-click “Mark Picked Up” that auto-fetches latest claim, then RPC
+  // One-click “Mark Picked Up”
   async function onQuickPickUp(itemId: number) {
     const uid = await getUid();
     if (!uid) return addToast("Not signed in.");
@@ -690,7 +500,7 @@ export default function AdminPage() {
     }
   }
 
-  // Optional: keep your manual desk’s button
+  // Manual desk button
   async function onMarkPickedUp() {
     const code = pickupCode.trim().toUpperCase();
     if (!code) return;
@@ -752,9 +562,7 @@ export default function AdminPage() {
       iso ? "schedule_set" : "schedule_cleared",
       "claim",
       schedClaim.id,
-      {
-        at: iso,
-      }
+      { at: iso }
     );
 
     setSchedOpen(false);
@@ -768,46 +576,15 @@ export default function AdminPage() {
   );
   const pendingClaims = claims.filter((c) => c.status === "pending");
 
-  const claimThumbs = useMemo(() => {
-    const map: Record<number, { itemThumb: string; proofs: string[] }> = {};
-    for (const c of claims) {
-      const item = items.find((i) => i.id === c.item_id);
-      const itemThumb = item
-        ? thumbMap[item.id] ?? FALLBACK_THUMB
-        : FALLBACK_THUMB;
+  const claimThumbs = useMemo(
+    () => computeClaimThumbs(claims, items, thumbMap),
+    [claims, items, thumbMap]
+  );
 
-      let proofs: string[] = [];
-      if ((c as any).proof && String((c as any).proof).trim()) {
-        const raw = String((c as any).proof);
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            proofs = parsed.map((p: string) => publicUrlFrom(CLAIM_BUCKET, p));
-          } else {
-            proofs = [publicUrlFrom(CLAIM_BUCKET, raw)];
-          }
-        } catch {
-          proofs = [publicUrlFrom(CLAIM_BUCKET, raw)];
-        }
-      }
-      map[c.id] = { itemThumb, proofs };
-    }
-    return map;
-  }, [claims, items, thumbMap]);
-
-  const visibleItems = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return items.filter((it) => {
-      const s = it.status as ItemStatusWidened;
-      const passStatus = statusFilter === "all" ? true : s === statusFilter;
-      const passSearch =
-        !needle ||
-        [it.id, it.title, it.category, (it as any).location, it.description]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(needle));
-      return passStatus && passSearch;
-    });
-  }, [items, statusFilter, q]);
+  const visibleItems = useMemo(
+    () => computeVisibleItems(items, statusFilter, q),
+    [items, statusFilter, q]
+  );
 
   const {
     totalItems,
@@ -819,58 +596,7 @@ export default function AdminPage() {
     rejectedCount,
     topCats,
     topLocs,
-  } = useMemo(() => {
-    const totalItems = items.length;
-    const totalClaims = claims.length;
-
-    let listed = 0,
-      on_hold = 0,
-      returned = 0,
-      pending = 0,
-      rejected = 0;
-
-    const THIRTY_D_MS = 30 * 24 * 60 * 60 * 1000;
-    const cutoff = Date.now() - THIRTY_D_MS;
-
-    const cat30 = new Map<string, number>();
-    const loc30 = new Map<string, number>();
-
-    for (const it of items) {
-      const s = it.status as ItemStatusWidened;
-      if (s === "listed") listed++;
-      else if (s === "on_hold") on_hold++;
-      else if (s === "pending") pending++;
-      else if (s === "rejected") rejected++;
-
-      const cat = (it.category ?? "Uncategorized").trim();
-      const loc = ((it as any).location ?? "—").trim();
-
-      const created = new Date(it.created_at).getTime();
-      if (!Number.isNaN(created) && created >= cutoff) {
-        cat30.set(cat, (cat30.get(cat) ?? 0) + 1);
-        loc30.set(loc, (loc30.get(loc) ?? 0) + 1);
-      }
-    }
-
-    const topCats = Array.from(cat30.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-    const topLocs = Array.from(loc30.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-
-    return {
-      totalItems,
-      totalClaims,
-      listedCount: listed,
-      onHoldCount: on_hold,
-      returnedCount: returned,
-      pendingCount: pending,
-      rejectedCount: rejected,
-      topCats,
-      topLocs,
-    };
-  }, [items, claims]);
+  } = useMemo(() => computeStats(items, claims), [items, claims]);
 
   /* ---------------- Render ---------------- */
   if (loading) {
@@ -1244,7 +970,6 @@ export default function AdminPage() {
                         <span className="mr-1 text-xs text-gray-500">
                           Awaiting pickup…
                         </span>
-                        {/* NEW quick pickup */}
                         <Btn
                           tone="success"
                           onClick={() => onQuickPickUp(it.id)}
@@ -1497,7 +1222,7 @@ function Header({
           <h1 className="text-2xl font-semibold tracking-tight">
             Admin Dashboard
           </h1>
-          <p className="text-sm text-white/80">
+          <p className="text-sm text白/80">
             Creek Lost & Found • moderation & insights
           </p>
         </div>
@@ -1817,7 +1542,7 @@ function Thumb({ src, alt }: { src?: string; alt?: string }) {
 }
 
 /* =========================================================
-   Chat Modal (per-claim chat) — Portal + lock
+   Chat Modal (per-claim chat)
    ======================================================= */
 function ChatModal({
   claim,
@@ -1936,7 +1661,6 @@ function ChatModal({
       return;
     }
 
-    // Audit: message sent
     await logEvent("message_sent", "message", data?.id ?? null, {
       claim_id: claim.id,
     });
