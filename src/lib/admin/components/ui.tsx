@@ -117,9 +117,17 @@ export function Pill({
   );
 }
 
-export function Row({ children }: { children: React.ReactNode }) {
+export function Row({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div
+      className={`flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}
+    >
       {children}
     </div>
   );

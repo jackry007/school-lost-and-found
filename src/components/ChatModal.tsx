@@ -1,3 +1,4 @@
+// src/lib/admin/components/modals/ChatModal.tsx
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -69,14 +70,15 @@ export default function ChatModal({
 
   const endRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const claimId = claim?.id ?? null;
+
+  // Which "seen" column conceptually applies to THIS viewer (for UI logic only)
   const seenField = meIsStaff ? "seen_by_staff" : "seen_by_claimant";
   const addressedToMe = (r: SenderRole) =>
     meIsStaff ? r === "claimant" || r === "student" : r === "staff";
 
-  /* Lock background scroll while open */
+  /* ===== Lock background scroll while open ===== */
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -86,29 +88,36 @@ export default function ChatModal({
     };
   }, [open]);
 
-  /* Load + mark seen + realtime */
+  /* ===== Helper: server-side mark seen via RPC (bypasses RLS) ===== */
+  async function rpcMarkSeen(cid: number) {
+    // idempotent; does nothing if already seen
+    await supabase.rpc("mark_thread_seen", {
+      p_claim_id: cid,
+      p_uid: currentUid,
+    });
+  }
+
+  /* ===== Load thread, mark read (RPC), and subscribe realtime ===== */
   useEffect(() => {
     if (!open || !claimId) return;
-    let alive = true;
+    let cancelled = false;
 
     (async () => {
+      // 1) Load existing messages
       const { data, error } = await supabase
         .from("claim_messages")
         .select("*")
         .eq("claim_id", claimId)
         .order("created_at", { ascending: true });
 
-      if (!alive) return;
-      if (!error && data) setMsgs(data as LocalMsg[]);
+      if (!cancelled && !error && data) setMsgs(data as LocalMsg[]);
 
-      await supabase
-        .from("claim_messages")
-        .update({ [seenField]: true })
-        .eq("claim_id", claimId)
-        .eq(seenField, false);
+      // 2) Mark seen on server (SECURITY DEFINER RPC handles claimant vs staff)
+      await rpcMarkSeen(claimId);
 
+      // 3) Realtime subscription
       const ch = supabase
-        .channel(`cm-${claimId}`)
+        .channel(`claim_messages:${claimId}`)
         .on(
           "postgres_changes",
           {
@@ -117,13 +126,21 @@ export default function ChatModal({
             table: "claim_messages",
             filter: `claim_id=eq.${claimId}`,
           },
-          (payload) => {
+          async (payload) => {
             const msg = payload.new as ClaimMessage;
             setMsgs((prev) => [...prev, msg]);
+
+            // If it's from the opposite side while I’m watching, mark seen via RPC
+            if (
+              msg.sender_uid !== currentUid &&
+              addressedToMe(msg.sender_role)
+            ) {
+              await rpcMarkSeen(claimId);
+            }
           }
         )
         .subscribe((status) => {
-          if (status === "SUBSCRIBED") setSubscribed(true);
+          if (!cancelled && status === "SUBSCRIBED") setSubscribed(true);
         });
 
       return () => {
@@ -132,32 +149,29 @@ export default function ChatModal({
     })();
 
     return () => {
-      alive = false;
+      cancelled = true;
       setSubscribed(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, claimId, seenField]);
+  }, [open, claimId, currentUid, meIsStaff]);
 
-  /* Mark as seen when a new incoming message arrives while open */
+  /* ===== Defense-in-depth: when the last message changes and is from the other side, mark seen ===== */
   useEffect(() => {
     if (!open || !claimId || msgs.length === 0) return;
     const last = msgs[msgs.length - 1];
     const mine = last.sender_uid === currentUid;
     if (!mine && addressedToMe(last.sender_role)) {
-      supabase
-        .from("claim_messages")
-        .update({ [seenField]: true })
-        .eq("claim_id", claimId)
-        .eq(seenField, false);
+      rpcMarkSeen(claimId);
     }
-  }, [open, claimId, msgs, currentUid, addressedToMe, seenField]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [msgs.length, open, claimId, currentUid]);
 
-  /* Keep scrolled to bottom (only chat body scrolls) */
+  /* ===== Keep scrolled to bottom ===== */
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [msgs.length]);
 
-  /* Focus textarea & ESC to close */
+  /* ===== Focus textarea & ESC ===== */
   useEffect(() => {
     if (!open) return;
     textareaRef.current?.focus();
@@ -166,7 +180,7 @@ export default function ChatModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  /* Auto-resize textarea up to ~6 lines */
+  /* ===== Auto-resize textarea up to ~6 lines ===== */
   useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -175,11 +189,11 @@ export default function ChatModal({
     ta.style.height = Math.min(max, ta.scrollHeight) + "px";
   }, [input]);
 
-  /* Send (optimistic) */
+  /* ===== Send (optimistic) ===== */
   async function send() {
     if (!claimId) return;
     const text = input.trim();
-    if (!text) return;
+    if (!text || sending) return;
 
     setSending(true);
     setInput("");
@@ -192,8 +206,9 @@ export default function ChatModal({
       sender_role: meIsStaff ? "staff" : "claimant",
       body: text,
       created_at: new Date().toISOString(),
-      seen_by_claimant: meIsStaff ? true : null,
-      seen_by_staff: meIsStaff ? null : true,
+      // Local UI: my own message is already seen on my side
+      seen_by_claimant: meIsStaff ? false : true,
+      seen_by_staff: meIsStaff ? true : false,
       _temp: true,
       _error: null,
     };
@@ -206,6 +221,9 @@ export default function ChatModal({
         sender_uid: currentUid,
         sender_role: optimistic.sender_role,
         body: text,
+        // Initialize flags on insert so unread counts are stable
+        seen_by_staff: meIsStaff ? true : false,
+        seen_by_claimant: meIsStaff ? false : true,
       })
       .select("*")
       .single();
@@ -216,11 +234,16 @@ export default function ChatModal({
           mm.id === tempId ? { ...mm, _error: error?.message || "Failed" } : mm
         )
       );
-    } else {
-      setMsgs((prev) =>
-        prev.map((mm) => (mm.id === tempId ? (data as LocalMsg) : mm))
-      );
+      setSending(false);
+      return;
     }
+
+    // Replace temp with server row
+    setMsgs((prev) =>
+      prev.map((mm) => (mm.id === tempId ? (data as LocalMsg) : mm))
+    );
+
+    // My send doesn’t need mark seen; receiver will trigger on their end
     setSending(false);
   }
 
@@ -240,10 +263,9 @@ export default function ChatModal({
         aria-hidden="true"
       />
 
-      {/* Centering shell */}
+      {/* Shell */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div
-          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="chat-modal-title"
@@ -290,7 +312,7 @@ export default function ChatModal({
             </div>
           </div>
 
-          {/* Body (scrolls) */}
+          {/* Body */}
           <div className="px-4 py-3 overflow-hidden">
             <div
               className="h-full overflow-y-auto rounded-xl border bg-white p-3"
@@ -382,6 +404,5 @@ export default function ChatModal({
     </div>
   );
 
-  // Portal to <body> to avoid transformed ancestor issues
   return createPortal(modal, document.body);
 }

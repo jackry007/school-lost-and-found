@@ -11,6 +11,8 @@ import { logEvent } from "@/lib/audit";
 // Constants still used directly in this page
 import {
   BUCKET,
+  CREEK_RED,
+  CREEK_NAVY,
   CREEK_SOFTR,
   CREEK_SOFTN,
   FALLBACK_THUMB,
@@ -83,6 +85,8 @@ type AuditRow = {
   user_agent?: string | null;
 };
 
+type AdminTab = "Overview" | "Queues" | "Activity";
+
 /* =========================================================
    Page
    ======================================================= */
@@ -138,6 +142,9 @@ export default function AdminPage() {
   // ----- Activity Log -----
   const [logRows, setLogRows] = useState<AuditRow[]>([]);
   const [logLoading, setLogLoading] = useState(true);
+  const [tab, setTab] = useState<AdminTab>("Overview");
+  const [logLoadedOnce, setLogLoadedOnce] = useState(false);
+  const [logPage, setLogPage] = useState(1); // pages of 50
 
   /* ---------------- Auth + load ---------------- */
   const load = async () => {
@@ -192,11 +199,15 @@ export default function AdminPage() {
 
   useEffect(() => {
     load();
-    loadLog();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // realtime refresh when claims change
+  useEffect(() => {
+    if (tab === "Activity" && !logLoadedOnce) {
+      loadLog().then(() => setLogLoadedOnce(true));
+    }
+  }, [tab, logLoadedOnce]);
+
+  // realtime refresh when claims change (kept)
   useEffect(() => {
     const ch = supabase
       .channel("claims-realtime")
@@ -212,11 +223,11 @@ export default function AdminPage() {
     return () => {
       void supabase.removeChannel(ch);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // realtime activity log
+  // realtime activity log (subscribe only when Activity is open)
   useEffect(() => {
+    if (tab !== "Activity") return;
     const ch = supabase
       .channel("audit-log-rt")
       .on(
@@ -232,7 +243,7 @@ export default function AdminPage() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, []);
+  }, [tab]);
 
   // build/refresh thumbnail map whenever items change
   useEffect(() => {
@@ -526,7 +537,6 @@ export default function AdminPage() {
     totalClaims,
     listedCount,
     onHoldCount,
-    // returnedCount, // (unused here; remove if you like)
     pendingCount,
     rejectedCount,
     topCats,
@@ -564,382 +574,627 @@ export default function AdminPage() {
     <div>
       <Header role={role} onSignOut={signOut} />
 
-      <main className="mx-auto max-w-6xl space-y-10 p-6">
-        {/* Quick Actions Row */}
-        <Card className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-gray-700">
-              <span className="font-medium">Pickup Desk:</span> Enter a pickup
-              code to mark a claim as picked up.
-            </div>
-            <form className="flex gap-2" onSubmit={onMarkReturnedSubmit}>
-              <input
-                value={pickupCode}
-                onChange={(e) => setPickupCode(e.target.value.toUpperCase())}
-                placeholder="Pickup code"
-                className="w-40 rounded-full border px-3 py-1.5 text-sm outline-none focus:ring-2"
-              />
-              <Btn
-                tone="success"
-                onClick={onMarkPickedUp}
-                disabled={markBusy || pickupCode.trim().length < 4}
-              >
-                {markBusy ? "Marking…" : "Mark Picked Up"}
-              </Btn>
-            </form>
-          </div>
-        </Card>
+      <main className="mx-auto max-w-6xl p-6">
+        {/* Tabs */}
+        <div className="flex items-center gap-2">
+          {(["Overview", "Queues", "Activity"] as AdminTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`rounded-full px-3 py-1.5 text-sm border shadow-sm ${
+                tab === t ? "text-white" : "text-gray-700 hover:bg-gray-50"
+              }`}
+              style={{
+                borderColor: tab === t ? "transparent" : "#e5e7eb",
+                background:
+                  tab === t
+                    ? `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`
+                    : "white",
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
 
-        {/* Analytics */}
-        <section>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <StatCard
-              label="Total items"
-              value={totalItems}
-              tint={CREEK_SOFTN}
-            />
-            <StatCard
-              label="Total claims"
-              value={totalClaims}
-              tint={CREEK_SOFTR}
-            />
-            <StatCard label="Listed" value={listedCount} tint="#eef7ff" />
-            <StatCard label="On Hold" value={onHoldCount} tint="#fff7ee" />
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-            <StatCard label="Pending" value={pendingCount} tint="#fff6e8" />
-            <StatCard label="Rejected" value={rejectedCount} tint="#fdeff0" />
+        {/* -------- Overview -------- */}
+        {tab === "Overview" && (
+          <div className="space-y-8 mt-4">
+            {/* Quick Actions Row */}
             <Card className="p-4">
-              <div className="mb-2 text-xs text-gray-500">
-                Top categories (30d)
-              </div>
-              {topCats.length ? (
-                <ul className="space-y-1 text-sm">
-                  {topCats.map(([k, v]) => (
-                    <li key={k} className="flex justify-between">
-                      <span className="truncate">{k}</span>
-                      <span className="ml-2 text-gray-700">{v}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-gray-600">—</div>
-              )}
-            </Card>
-          </div>
-
-          <Card className="mt-4 p-4">
-            <div className="mb-2 text-xs text-gray-500">
-              Top locations (30d)
-            </div>
-            {topLocs.length ? (
-              <ul className="grid gap-1 text-sm sm:grid-cols-2">
-                {topLocs.map(([k, v]) => (
-                  <li key={k} className="flex justify-between">
-                    <span className="truncate">{k}</span>
-                    <span className="ml-2 text-gray-700">{v}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-sm text-gray-600">—</div>
-            )}
-          </Card>
-        </section>
-
-        {/* Activity Log */}
-        <section className="space-y-3">
-          <SectionHeading>Activity Log</SectionHeading>
-          <Card>
-            {logLoading ? (
-              <div className="p-4 text-sm text-gray-500">Loading…</div>
-            ) : logRows.length === 0 ? (
-              <div className="p-6 text-center text-sm text-gray-600">
-                No activity yet.
-              </div>
-            ) : (
-              <ul className="divide-y">
-                {logRows.map((r) => (
-                  <li
-                    key={r.id}
-                    className="p-3 flex items-start justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-800">
-                          {r.entity_type}
-                          {r.entity_id ? `#${r.entity_id}` : ""}
-                        </span>
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-blue-800">
-                          {r.action}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-sm text-gray-800 break-words">
-                        {Object.keys(r.details ?? {}).length
-                          ? JSON.stringify(r.details ?? {}, null, 0)
-                          : "—"}
-                      </div>
-                      {r.actor_uid && (
-                        <div className="mt-1 text-[11px] text-gray-500">
-                          by {r.actor_uid}
-                        </div>
-                      )}
-                    </div>
-                    <div className="shrink-0 text-xs text-gray-500">
-                      {new Date(r.at).toLocaleString()}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </section>
-
-        {/* Moderation queues */}
-        <section className="space-y-6">
-          <SectionHeading>
-            Pending Items <Badge tone="amber">{pendingItems.length}</Badge>
-          </SectionHeading>
-          <div className="space-y-3">
-            {pendingItems.length === 0 && <EmptyRow text="No pending items." />}
-            {pendingItems.map((it) => (
-              <Row key={it.id}>
-                <div className="flex items-center">
-                  <Thumb src={thumbMap[it.id]} alt={it.title} />
-                  <RowInfo
-                    title={`#${it.id} · ${it.title}`}
-                    meta={`${it.category ?? "—"} · ${
-                      (it as any).location ?? "—"
-                    } · submitted ${new Date(it.created_at).toLocaleString()}`}
-                  />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-gray-700">
+                  <span className="font-medium">Pickup Desk:</span> Enter a
+                  pickup code to mark a claim as picked up.
                 </div>
-                <RowActions>
-                  <Btn tone="primary" onClick={() => askApprove(it)}>
-                    Approve &amp; List
-                  </Btn>
+                <form className="flex gap-2" onSubmit={onMarkReturnedSubmit}>
+                  <input
+                    value={pickupCode}
+                    onChange={(e) =>
+                      setPickupCode(e.target.value.toUpperCase())
+                    }
+                    placeholder="Pickup code"
+                    className="w-40 rounded-full border px-3 py-1.5 text-sm outline-none focus:ring-2"
+                  />
                   <Btn
-                    tone="danger"
-                    onClick={() => updateItemStatus(it.id, "rejected")}
+                    tone="success"
+                    onClick={onMarkPickedUp}
+                    disabled={markBusy || pickupCode.trim().length < 4}
                   >
-                    Reject
+                    {markBusy ? "Marking…" : "Mark Picked Up"}
                   </Btn>
-                  <Btn tone="ghost" onClick={() => openEdit(it)}>
-                    Edit
-                  </Btn>
-                </RowActions>
-              </Row>
-            ))}
-          </div>
+                </form>
+              </div>
+            </Card>
 
-          <SectionHeading>
-            Pending Claims <Badge tone="amber">{pendingClaims.length}</Badge>
-          </SectionHeading>
-          <div className="space-y-3">
-            {pendingClaims.length === 0 && (
-              <EmptyRow text="No pending claims." />
-            )}
+            {/* Analytics */}
+            <section>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <StatCard
+                  label="Total items"
+                  value={totalItems}
+                  tint={CREEK_SOFTN}
+                />
+                <StatCard
+                  label="Total claims"
+                  value={totalClaims}
+                  tint={CREEK_SOFTR}
+                />
+                <StatCard label="Listed" value={listedCount} tint="#eef7ff" />
+                <StatCard label="On Hold" value={onHoldCount} tint="#fff7ee" />
+              </div>
 
-            {pendingClaims.map((c) => {
-              const t = claimThumbs[c.id];
-              const sched = (c as any).schedule_at as string | null | undefined;
-              const schedChip = sched ? new Date(sched).toLocaleString() : null;
-
-              return (
-                <Row key={c.id}>
-                  {/* Left: item thumb + info */}
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
-                    <RowInfo
-                      title={
-                        <>
-                          Claim #{c.id} → Item #{c.item_id}
-                          {schedChip && (
-                            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800">
-                              {schedChip}
-                            </span>
-                          )}
-                        </>
-                      }
-                      meta={
-                        <>
-                          {(c as any).claimant_name} (
-                          {(c as any).claimant_email})
-                          {(c as any).proof && (
-                            <>
-                              {" "}
-                              ·{" "}
-                              <span className="text-gray-500">
-                                proof attached
-                              </span>
-                            </>
-                          )}
-                        </>
-                      }
-                    />
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <StatCard label="Pending" value={pendingCount} tint="#fff6e8" />
+                <StatCard
+                  label="Rejected"
+                  value={rejectedCount}
+                  tint="#fdeff0"
+                />
+                <Card className="p-4">
+                  <div className="mb-2 text-xs text-gray-500">
+                    Top categories (30d)
                   </div>
+                  {topCats.length ? (
+                    <ul className="space-y-1 text-sm">
+                      {topCats.map(([k, v]) => (
+                        <li key={k} className="flex justify-between">
+                          <span className="truncate">{k}</span>
+                          <span className="ml-2 text-gray-700">{v}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-gray-600">—</div>
+                  )}
+                </Card>
+              </div>
 
-                  {/* Right: actions */}
-                  <div className="flex shrink-0 items-center gap-2">
-                    {t?.proofs?.length > 0 && (
-                      <button
-                        className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                        onClick={() =>
-                          openPhotos(`Proof photos — Claim #${c.id}`, t.proofs)
-                        }
-                        title="View proof photos"
-                      >
-                        View Proofs ({t.proofs.length})
-                      </button>
-                    )}
+              <Card className="mt-4 p-4">
+                <div className="mb-2 text-xs text-gray-500">
+                  Top locations (30d)
+                </div>
+                {topLocs.length ? (
+                  <ul className="grid gap-1 text-sm sm:grid-cols-2">
+                    {topLocs.map(([k, v]) => (
+                      <li key={k} className="flex justify-between">
+                        <span className="truncate">{k}</span>
+                        <span className="ml-2 text-gray-700">{v}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-600">—</div>
+                )}
+              </Card>
+            </section>
 
-                    <Btn tone="ghost" onClick={() => openChat(c)}>
-                      Message
-                    </Btn>
+            {/* NEW: Pending Snapshots */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <SectionHeading>Pending Snapshot</SectionHeading>
+                <Btn tone="ghost" onClick={() => setTab("Queues")}>
+                  View all in Queues →
+                </Btn>
+              </div>
 
-                    <Btn tone="ghost" onClick={() => openSchedule(c)}>
-                      {schedChip ? "Reschedule" : "Schedule"}
-                    </Btn>
-
-                    <Btn tone="primary" onClick={() => onApproveClaim(c)}>
-                      Approve
-                    </Btn>
-                    <Btn tone="ghost" onClick={() => onAskInfo(c)}>
-                      Ask Info
-                    </Btn>
-                    <Btn tone="danger" onClick={() => onRejectClaim(c)}>
-                      Reject
-                    </Btn>
-                  </div>
-                </Row>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Filters + items */}
-        <section className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  "all",
-                  "pending",
-                  "listed",
-                  "on_hold",
-                  "claimed",
-                  "rejected",
-                ] as StatusFilter[]
-              ).map((sf) => (
-                <Pill
-                  key={sf}
-                  active={statusFilter === sf}
-                  onClick={() => setStatusFilter(sf)}
-                >
-                  {sf
-                    .replace("_", " ")
-                    .replace(/\b\w/g, (m) => m.toUpperCase())}
-                </Pill>
-              ))}
-            </div>
-            <div className="relative w-full sm:w-80">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search items…"
-                className="w-full rounded-full border px-4 py-2 pl-10 outline-none focus:ring-2"
-                style={{ borderColor: "#e5e7eb" }}
-              />
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                🔎
-              </span>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            {visibleItems.length === 0 && (
-              <EmptyRow text="No items match your filters." />
-            )}
-            {visibleItems.map((it) => {
-              const s = it.status as ItemStatusWidened;
-              return (
-                <Row key={it.id}>
-                  <div className="flex items-center">
-                    <Thumb src={thumbMap[it.id]} alt={it.title} />
-                    <RowInfo
-                      title={`#${it.id} · ${it.title}`}
-                      meta={
-                        <>
-                          <StatusBadge status={s} /> · {it.category ?? "—"} ·{" "}
-                          {(it as any).location ?? "—"}
-                        </>
-                      }
-                    />
-                  </div>
-                  <RowActions>
-                    {s === "pending" && (
-                      <>
-                        <Btn tone="primary" onClick={() => askApprove(it)}>
-                          Approve &amp; List
-                        </Btn>
-                        <Btn
-                          tone="danger"
-                          onClick={() => updateItemStatus(it.id, "rejected")}
-                        >
-                          Reject
-                        </Btn>
-                        <Btn tone="ghost" onClick={() => openEdit(it)}>
-                          Edit
-                        </Btn>
-                      </>
-                    )}
-                    {s === "listed" && (
-                      <>
-                        <Btn tone="ghost" onClick={() => openEdit(it)}>
-                          Edit
-                        </Btn>
-                      </>
-                    )}
-                    {s === "on_hold" && (
-                      <>
-                        <span className="mr-1 text-xs text-gray-500">
-                          Awaiting pickup…
-                        </span>
-                        <Btn
-                          tone="success"
-                          onClick={() => onQuickPickUp(it.id)}
-                          disabled={markBusy}
-                        >
-                          {markBusy ? "Working…" : "Mark Picked Up"}
-                        </Btn>
-                        <Btn
-                          tone="secondary"
-                          onClick={() => restoreToListed(it.id)}
-                          disabled={markBusy}
-                        >
-                          Release Hold
-                        </Btn>
-                      </>
-                    )}
-                    {s === "claimed" && (
-                      <span className="text-xs text-emerald-700">
-                        Picked Up 🎉
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Pending Items (Top 3) */}
+                <Card className="p-0">
+                  <div className="flex items-center justify-between p-4">
+                    <div className="font-medium">
+                      Pending Items{" "}
+                      <span className="text-gray-500">
+                        ({pendingItems.length})
+                      </span>
+                    </div>
+                    {pendingItems.length > 3 && (
+                      <span className="text-xs text-gray-500 pr-2">
+                        showing 3
                       </span>
                     )}
-                    {s === "rejected" && (
-                      <Btn
-                        tone="secondary"
-                        onClick={() => restoreToListed(it.id)}
-                      >
-                        Restore to Listed
-                      </Btn>
+                  </div>
+                  <div className="divide-y">
+                    {pendingItems.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-gray-600">
+                        No pending items.
+                      </div>
+                    ) : (
+                      pendingItems.slice(0, 3).map((it) => (
+                        <Row key={it.id} className="px-3 py-2">
+                          <div className="flex items-center">
+                            <Thumb src={thumbMap[it.id]} alt={it.title} />
+                            <RowInfo
+                              title={`#${it.id} · ${it.title}`}
+                              meta={`${it.category ?? "—"} · ${
+                                (it as any).location ?? "—"
+                              }`}
+                            />
+                          </div>
+                          <RowActions>
+                            <Btn tone="primary" onClick={() => askApprove(it)}>
+                              Approve
+                            </Btn>
+                            <Btn
+                              tone="danger"
+                              onClick={() =>
+                                updateItemStatus(it.id, "rejected")
+                              }
+                            >
+                              Reject
+                            </Btn>
+                            <Btn tone="ghost" onClick={() => openEdit(it)}>
+                              Edit
+                            </Btn>
+                          </RowActions>
+                        </Row>
+                      ))
                     )}
-                  </RowActions>
-                </Row>
-              );
-            })}
+                  </div>
+                </Card>
+
+                {/* Pending Claims (Top 3) */}
+                <Card className="p-0">
+                  <div className="flex items-center justify-between p-4">
+                    <div className="font-medium">
+                      Pending Claims{" "}
+                      <span className="text-gray-500">
+                        ({pendingClaims.length})
+                      </span>
+                    </div>
+                    {pendingClaims.length > 3 && (
+                      <span className="text-xs text-gray-500 pr-2">
+                        showing 3
+                      </span>
+                    )}
+                  </div>
+                  <div className="divide-y">
+                    {pendingClaims.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-gray-600">
+                        No pending claims.
+                      </div>
+                    ) : (
+                      pendingClaims.slice(0, 3).map((c) => {
+                        const t = claimThumbs[c.id];
+                        const sched = (c as any).schedule_at as
+                          | string
+                          | null
+                          | undefined;
+                        const schedChip = sched
+                          ? new Date(sched).toLocaleString()
+                          : null;
+
+                        return (
+                          <Row key={c.id} className="px-3 py-2">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Thumb
+                                src={t?.itemThumb}
+                                alt={`Item #${c.item_id}`}
+                              />
+                              <RowInfo
+                                title={
+                                  <>
+                                    Claim #{c.id} → Item #{c.item_id}
+                                    {schedChip && (
+                                      <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800">
+                                        {schedChip}
+                                      </span>
+                                    )}
+                                  </>
+                                }
+                                meta={
+                                  <>
+                                    {(c as any).claimant_name} (
+                                    {(c as any).claimant_email})
+                                    {(c as any).proof && (
+                                      <>
+                                        {" · "}
+                                        <span className="text-gray-500">
+                                          proof attached
+                                        </span>
+                                      </>
+                                    )}
+                                  </>
+                                }
+                              />
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                              {t?.proofs?.length > 0 && (
+                                <button
+                                  className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                                  onClick={() =>
+                                    openPhotos(
+                                      `Proof photos — Claim #${c.id}`,
+                                      t.proofs
+                                    )
+                                  }
+                                  title="View proof photos"
+                                >
+                                  View Proofs ({t.proofs.length})
+                                </button>
+                              )}
+                              <Btn tone="ghost" onClick={() => openChat(c)}>
+                                Message
+                              </Btn>
+                              <Btn tone="ghost" onClick={() => openSchedule(c)}>
+                                {schedChip ? "Reschedule" : "Schedule"}
+                              </Btn>
+                              <Btn
+                                tone="primary"
+                                onClick={() => onApproveClaim(c)}
+                              >
+                                Approve
+                              </Btn>
+                              <Btn tone="ghost" onClick={() => onAskInfo(c)}>
+                                Ask Info
+                              </Btn>
+                              <Btn
+                                tone="danger"
+                                onClick={() => onRejectClaim(c)}
+                              >
+                                Reject
+                              </Btn>
+                            </div>
+                          </Row>
+                        );
+                      })
+                    )}
+                  </div>
+                </Card>
+              </div>
+            </section>
+
+            {/* Recent Activity (preview) */}
+            <section className="space-y-3">
+              <SectionHeading>Recent Activity</SectionHeading>
+              <Card>
+                {!logLoadedOnce ? (
+                  <div className="p-4 text-sm text-gray-500">
+                    Open the Activity tab to load logs…
+                  </div>
+                ) : logLoading ? (
+                  <div className="p-4 text-sm text-gray-500">Loading…</div>
+                ) : logRows.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-600">
+                    No activity yet.
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {logRows.slice(0, 8).map((r) => (
+                      <CompactLogRow key={r.id} row={r} />
+                    ))}
+                  </ul>
+                )}
+              </Card>
+              <div className="flex justify-end">
+                <Btn tone="ghost" onClick={() => setTab("Activity")}>
+                  Open full Activity Log →
+                </Btn>
+              </div>
+            </section>
           </div>
-        </section>
+        )}
+
+        {/* -------- Queues -------- */}
+        {tab === "Queues" && (
+          <div className="space-y-8 mt-4">
+            {/* Pending Items */}
+            <section className="space-y-3">
+              <SectionHeading>
+                Pending Items <Badge tone="amber">{pendingItems.length}</Badge>
+              </SectionHeading>
+              <div className="space-y-3">
+                {pendingItems.length === 0 && (
+                  <EmptyRow text="No pending items." />
+                )}
+                {pendingItems.map((it) => (
+                  <Row key={it.id}>
+                    <div className="flex items-center">
+                      <Thumb src={thumbMap[it.id]} alt={it.title} />
+                      <RowInfo
+                        title={`#${it.id} · ${it.title}`}
+                        meta={`${it.category ?? "—"} · ${
+                          (it as any).location ?? "—"
+                        } · submitted ${new Date(
+                          it.created_at
+                        ).toLocaleString()}`}
+                      />
+                    </div>
+                    <RowActions>
+                      <Btn tone="primary" onClick={() => askApprove(it)}>
+                        Approve &amp; List
+                      </Btn>
+                      <Btn
+                        tone="danger"
+                        onClick={() => updateItemStatus(it.id, "rejected")}
+                      >
+                        Reject
+                      </Btn>
+                      <Btn tone="ghost" onClick={() => openEdit(it)}>
+                        Edit
+                      </Btn>
+                    </RowActions>
+                  </Row>
+                ))}
+              </div>
+            </section>
+
+            {/* Pending Claims */}
+            <section className="space-y-3">
+              <SectionHeading>
+                Pending Claims{" "}
+                <Badge tone="amber">{pendingClaims.length}</Badge>
+              </SectionHeading>
+              <div className="space-y-3">
+                {pendingClaims.length === 0 && (
+                  <EmptyRow text="No pending claims." />
+                )}
+
+                {pendingClaims.map((c) => {
+                  const t = claimThumbs[c.id];
+                  const sched = (c as any).schedule_at as
+                    | string
+                    | null
+                    | undefined;
+                  const schedChip = sched
+                    ? new Date(sched).toLocaleString()
+                    : null;
+
+                  return (
+                    <Row key={c.id}>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
+                        <RowInfo
+                          title={
+                            <>
+                              Claim #{c.id} → Item #{c.item_id}
+                              {schedChip && (
+                                <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800">
+                                  {schedChip}
+                                </span>
+                              )}
+                            </>
+                          }
+                          meta={
+                            <>
+                              {(c as any).claimant_name} (
+                              {(c as any).claimant_email})
+                              {(c as any).proof && (
+                                <>
+                                  {" "}
+                                  ·{" "}
+                                  <span className="text-gray-500">
+                                    proof attached
+                                  </span>
+                                </>
+                              )}
+                            </>
+                          }
+                        />
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        {t?.proofs?.length > 0 && (
+                          <button
+                            className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                            onClick={() =>
+                              openPhotos(
+                                `Proof photos — Claim #${c.id}`,
+                                t.proofs
+                              )
+                            }
+                            title="View proof photos"
+                          >
+                            View Proofs ({t.proofs.length})
+                          </button>
+                        )}
+
+                        <Btn tone="ghost" onClick={() => openChat(c)}>
+                          Message
+                        </Btn>
+
+                        <Btn tone="ghost" onClick={() => openSchedule(c)}>
+                          {schedChip ? "Reschedule" : "Schedule"}
+                        </Btn>
+
+                        <Btn tone="primary" onClick={() => onApproveClaim(c)}>
+                          Approve
+                        </Btn>
+                        <Btn tone="ghost" onClick={() => onAskInfo(c)}>
+                          Ask Info
+                        </Btn>
+                        <Btn tone="danger" onClick={() => onRejectClaim(c)}>
+                          Reject
+                        </Btn>
+                      </div>
+                    </Row>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Filters + items */}
+            <section className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      "all",
+                      "pending",
+                      "listed",
+                      "on_hold",
+                      "claimed",
+                      "rejected",
+                    ] as StatusFilter[]
+                  ).map((sf) => (
+                    <Pill
+                      key={sf}
+                      active={statusFilter === sf}
+                      onClick={() => setStatusFilter(sf)}
+                    >
+                      {sf
+                        .replace("_", " ")
+                        .replace(/\b\w/g, (m) => m.toUpperCase())}
+                    </Pill>
+                  ))}
+                </div>
+                <div className="relative w-full sm:w-80">
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search items…"
+                    className="w-full rounded-full border px-4 py-2 pl-10 outline-none focus:ring-2"
+                    style={{ borderColor: "#e5e7eb" }}
+                  />
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    🔎
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {visibleItems.length === 0 && (
+                  <EmptyRow text="No items match your filters." />
+                )}
+                {visibleItems.map((it) => {
+                  const s = it.status as ItemStatusWidened;
+                  return (
+                    <Row key={it.id}>
+                      <div className="flex items-center">
+                        <Thumb src={thumbMap[it.id]} alt={it.title} />
+                        <RowInfo
+                          title={`#${it.id} · ${it.title}`}
+                          meta={
+                            <>
+                              <StatusBadge status={s} /> · {it.category ?? "—"}{" "}
+                              · {(it as any).location ?? "—"}
+                            </>
+                          }
+                        />
+                      </div>
+                      <RowActions>
+                        {s === "pending" && (
+                          <>
+                            <Btn tone="primary" onClick={() => askApprove(it)}>
+                              Approve &amp; List
+                            </Btn>
+                            <Btn
+                              tone="danger"
+                              onClick={() =>
+                                updateItemStatus(it.id, "rejected")
+                              }
+                            >
+                              Reject
+                            </Btn>
+                            <Btn tone="ghost" onClick={() => openEdit(it)}>
+                              Edit
+                            </Btn>
+                          </>
+                        )}
+                        {s === "listed" && (
+                          <>
+                            <Btn tone="ghost" onClick={() => openEdit(it)}>
+                              Edit
+                            </Btn>
+                          </>
+                        )}
+                        {s === "on_hold" && (
+                          <>
+                            <span className="mr-1 text-xs text-gray-500">
+                              Awaiting pickup…
+                            </span>
+                            <Btn
+                              tone="success"
+                              onClick={() => onQuickPickUp(it.id)}
+                              disabled={markBusy}
+                            >
+                              {markBusy ? "Working…" : "Mark Picked Up"}
+                            </Btn>
+                            <Btn
+                              tone="secondary"
+                              onClick={() => restoreToListed(it.id)}
+                              disabled={markBusy}
+                            >
+                              Release Hold
+                            </Btn>
+                          </>
+                        )}
+                        {s === "claimed" && (
+                          <span className="text-xs text-emerald-700">
+                            Picked Up 🎉
+                          </span>
+                        )}
+                        {s === "rejected" && (
+                          <Btn
+                            tone="secondary"
+                            onClick={() => restoreToListed(it.id)}
+                          >
+                            Restore to Listed
+                          </Btn>
+                        )}
+                      </RowActions>
+                    </Row>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* -------- Activity -------- */}
+        {tab === "Activity" && (
+          <section className="space-y-3 mt-4">
+            <SectionHeading>Activity Log</SectionHeading>
+            <Card>
+              {!logLoadedOnce || logLoading ? (
+                <div className="p-4 text-sm text-gray-500">Loading…</div>
+              ) : logRows.length === 0 ? (
+                <div className="p-6 text-center text-sm text-gray-600">
+                  No activity yet.
+                </div>
+              ) : (
+                <>
+                  <ul className="divide-y">
+                    {logRows.slice(0, logPage * 50).map((r) => (
+                      <CompactLogRow key={r.id} row={r} />
+                    ))}
+                  </ul>
+                  {logRows.length > logPage * 50 && (
+                    <div className="p-3 flex justify-center">
+                      <Btn
+                        tone="ghost"
+                        onClick={() => setLogPage((p) => p + 1)}
+                      >
+                        Load more
+                      </Btn>
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+          </section>
+        )}
       </main>
 
       {/* Edit Modal */}
@@ -1118,5 +1373,38 @@ export default function AdminPage() {
       {/* Toast outlet */}
       {toastNode}
     </div>
+  );
+}
+
+/* ===================== Compact Activity Row ===================== */
+function CompactLogRow({ row }: { row: AuditRow }) {
+  const detailsText =
+    row?.details && Object.keys(row.details).length
+      ? JSON.stringify(row.details)
+      : "—";
+
+  return (
+    <li className="px-3 py-2 flex items-start justify-between gap-3 text-[13px]">
+      <div className="min-w-0 flex items-center gap-2">
+        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-800">
+          {row.entity_type}
+          {row.entity_id ? `#${row.entity_id}` : ""}
+        </span>
+        <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-blue-800">
+          {row.action}
+        </span>
+        <div className="min-w-0 truncate text-gray-800" title={detailsText}>
+          {detailsText}
+        </div>
+        {row.actor_uid && (
+          <span className="shrink-0 text-[11px] text-gray-500 ml-1">
+            · {row.actor_uid}
+          </span>
+        )}
+      </div>
+      <div className="shrink-0 text-[11px] text-gray-500">
+        {new Date(row.at).toLocaleString()}
+      </div>
+    </li>
   );
 }
