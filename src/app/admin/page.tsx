@@ -1,25 +1,48 @@
 // src/app/admin/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import type { Item, Claim } from "@/lib/types";
 import { markClaimPickedUp } from "@/lib/claimsActions";
 import { logEvent } from "@/lib/audit";
 
-// --- NEW modular imports ---
+// Constants still used directly in this page
 import {
   BUCKET,
-  CREEK_RED,
-  CREEK_NAVY,
   CREEK_SOFTR,
   CREEK_SOFTN,
   FALLBACK_THUMB,
 } from "@/lib/admin/constants";
+
+// Toasts
 import { useToasts } from "@/lib/admin/hooks/useToasts";
-import { useBodyScrollLock } from "@/lib/admin/hooks/useBodyScrollLock";
-import { Portal } from "@/lib/admin/Portal";
+
+// UI components (barrel)
+import {
+  Header,
+  Card,
+  StatCard,
+  Pill,
+  Row,
+  EmptyRow,
+  RowInfo,
+  RowActions,
+  Btn,
+  Badge,
+  StatusBadge,
+  Labeled,
+  Thumb,
+  SectionHeading,
+} from "@/lib/admin/components";
+
+// Modals
+import { Modal } from "@/lib/admin/components/modals/Modal";
+import { ConfirmModal } from "@/lib/admin/components/modals/ConfirmModal";
+import { ChatModal } from "@/lib/admin/components/modals/ChatModal";
+
+// RPC & selectors
 import {
   getUid,
   approveClaimRPC,
@@ -49,17 +72,6 @@ type StatusFilter =
   | "expired"
   | "completed";
 
-type ChatMessage = {
-  id: number;
-  claim_id: number;
-  sender_uid: string;
-  sender_role: "staff" | "claimant";
-  body: string;
-  created_at: string;
-  seen_by_claimant: boolean | null;
-  seen_by_staff: boolean | null;
-};
-
 type AuditRow = {
   id: number;
   at: string;
@@ -70,83 +82,6 @@ type AuditRow = {
   details: any;
   user_agent?: string | null;
 };
-
-/* =========================================================
-   Confirm Modal (for item approve)
-   ======================================================= */
-function ConfirmModal({
-  open,
-  title,
-  children,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
-  onConfirm,
-  onCancel,
-  busy = false,
-}: {
-  open: boolean;
-  title: string;
-  children?: React.ReactNode;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  busy?: boolean;
-}) {
-  useBodyScrollLock(open);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (!open) return;
-      if (e.key === "Escape") onCancel();
-      if (e.key === "Enter") onConfirm();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onCancel, onConfirm]);
-
-  if (!open) return null;
-
-  return (
-    <Portal>
-      <div className="fixed inset-0 z-[100]">
-        <div className="fixed inset-0 bg-black/40" onClick={onCancel} />
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="w-[95%] max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-              <div
-                className="px-4 py-3 text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-                }}
-              >
-                <h3 className="text-base font-semibold">{title}</h3>
-              </div>
-              <div className="p-4 text-sm text-gray-800">{children}</div>
-              <div className="flex justify-end gap-2 p-4 pt-0">
-                <button
-                  onClick={onCancel}
-                  disabled={busy}
-                  className="rounded-md border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-                >
-                  {cancelLabel}
-                </button>
-                <button
-                  onClick={onConfirm}
-                  disabled={busy}
-                  className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-md disabled:opacity-60"
-                  style={{ backgroundColor: CREEK_RED }}
-                >
-                  {busy ? "Working…" : confirmLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Portal>
-  );
-}
 
 /* =========================================================
    Page
@@ -591,7 +526,7 @@ export default function AdminPage() {
     totalClaims,
     listedCount,
     onHoldCount,
-    returnedCount,
+    // returnedCount, // (unused here; remove if you like)
     pendingCount,
     rejectedCount,
     topCats,
@@ -1183,592 +1118,5 @@ export default function AdminPage() {
       {/* Toast outlet */}
       {toastNode}
     </div>
-  );
-}
-
-/* ===================== Pretty UI bits ===================== */
-
-function Labeled({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1 text-sm">
-      <span className="text-gray-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Header({
-  role,
-  onSignOut,
-}: {
-  role: string | null;
-  onSignOut: () => void;
-}) {
-  return (
-    <header
-      className="w-full"
-      style={{
-        background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-      }}
-    >
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-6 text-white sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Admin Dashboard
-          </h1>
-          <p className="text-sm text白/80">
-            Creek Lost & Found • moderation & insights
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {role && (
-            <span className="rounded-full bg-white/10 px-2 py-1 text-xs ring-1 ring-white/20">
-              Signed in as <strong className="font-semibold">{role}</strong>
-            </span>
-          )}
-          <button
-            onClick={onSignOut}
-            className="rounded-full bg-white px-3 py-1.5 text-[13px] font-medium shadow hover:bg白/90"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="flex items-center gap-2 text-lg font-semibold">
-      {children}
-    </h2>
-  );
-}
-
-function Badge({
-  children,
-  tone = "gray",
-}: {
-  children: React.ReactNode;
-  tone?: "gray" | "amber" | "green" | "red";
-}) {
-  const tones: Record<string, string> = {
-    gray: "bg-gray-100 text-gray-700",
-    amber: "bg-amber-100 text-amber-800",
-    green: "bg-emerald-100 text-emerald-800",
-    red: "bg-rose-100 text-rose-800",
-  };
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}>
-      {children}
-    </span>
-  );
-}
-
-function Card({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-2xl border border-gray-200 bg-white shadow-sm ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tint = "#f8fafc",
-}: {
-  label: string;
-  value: number | string;
-  tint?: string;
-}) {
-  return (
-    <div
-      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
-      style={{ background: `linear-gradient(180deg, ${tint} 0%, white 60%)` }}
-    >
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
-    </div>
-  );
-}
-
-function Pill({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-sm shadow-sm transition ${
-        active ? "text-white" : "text-gray-700 hover:bg-gray-50"
-      }`}
-      style={{
-        borderColor: active ? "transparent" : "#e5e7eb",
-        background: active
-          ? `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`
-          : "white",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Row({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      {children}
-    </div>
-  );
-}
-
-function EmptyRow({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-600">
-      {text}
-    </div>
-  );
-}
-
-function RowInfo({
-  title,
-  meta,
-}: {
-  title: React.ReactNode;
-  meta?: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="truncate font-medium">{title}</div>
-      {meta && (
-        <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-600">
-          {meta}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RowActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex shrink-0 gap-2">{children}</div>;
-}
-
-function Btn({
-  children,
-  onClick,
-  tone = "primary",
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  tone?: "primary" | "secondary" | "danger" | "ghost" | "success";
-  disabled?: boolean;
-}) {
-  const base = "rounded-full px-3 py-1.5 text-sm";
-  if (tone === "primary") {
-    return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`${base} text-white shadow-sm disabled:opacity-60`}
-        style={{
-          background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-        }}
-      >
-        {children}
-      </button>
-    );
-  }
-  if (tone === "danger") {
-    return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`${base} text-white shadow-sm disabled:opacity-60`}
-        style={{
-          background: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
-        }}
-      >
-        {children}
-      </button>
-    );
-  }
-  if (tone === "success") {
-    return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`${base} text-white shadow-sm disabled:opacity-60`}
-        style={{
-          background: "linear-gradient(135deg, #10b981 0%, #065f46 100%)",
-        }}
-      >
-        {children}
-      </button>
-    );
-  }
-  if (tone === "secondary") {
-    return (
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`${base} border text-[13px] disabled:opacity-60`}
-        style={{
-          color: CREEK_NAVY,
-          borderColor: CREEK_NAVY,
-          background: CREEK_SOFTN,
-        }}
-      >
-        {children}
-      </button>
-    );
-  }
-  // ghost
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${base} text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function StatusBadge({ status }: { status: ItemStatusWidened }) {
-  const look =
-    status === "claimed"
-      ? "bg-emerald-100 text-emerald-800"
-      : status === "on_hold"
-      ? "bg-amber-100 text-amber-800"
-      : status === "listed"
-      ? "bg-green-100 text-green-800"
-      : status === "pending"
-      ? "bg-amber-100 text-amber-800"
-      : status === "rejected"
-      ? "bg-rose-100 text-rose-800"
-      : "bg-gray-100 text-gray-800";
-
-  const label =
-    status === "claimed"
-      ? "Picked Up"
-      : status === "on_hold"
-      ? "On Hold"
-      : status.charAt(0).toUpperCase() + status.slice(1);
-
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] ${look}`}>
-      {label}
-    </span>
-  );
-}
-
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  useBodyScrollLock(true);
-  return (
-    <Portal>
-      <div className="fixed inset-0 z-[100]">
-        <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="w-[95%] max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl">
-              <div
-                className="rounded-t-2xl px-4 py-3 text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold">{title}</h3>
-                  <button
-                    className="text-sm text-white/90 hover:text-white"
-                    onClick={onClose}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-              <div className="p-4">{children}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Portal>
-  );
-}
-
-// ---------- Tiny thumb component ----------
-function Thumb({ src, alt }: { src?: string; alt?: string }) {
-  return (
-    <div className="mr-3 h-12 w-16 overflow-hidden rounded-md border border-gray-200 bg-gray-50">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src || FALLBACK_THUMB}
-        alt={alt || ""}
-        className="h-full w-full object-cover"
-        loading="lazy"
-      />
-    </div>
-  );
-}
-
-/* =========================================================
-   Chat Modal (per-claim chat)
-   ======================================================= */
-function ChatModal({
-  claim,
-  meIsStaff,
-  onClose,
-}: {
-  claim: Claim;
-  meIsStaff: boolean;
-  onClose: () => void;
-}) {
-  useBodyScrollLock(true);
-
-  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
-  const [myUid, setMyUid] = useState<string | null>(null);
-
-  // load current user + messages
-  useEffect(() => {
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      setMyUid(u.user?.id ?? null);
-
-      const { data } = await supabase
-        .from("claim_messages")
-        .select("*")
-        .eq("claim_id", claim.id)
-        .order("created_at", { ascending: true });
-
-      setMsgs((data as ChatMessage[]) || []);
-
-      // mark seen (staff side)
-      await supabase
-        .from("claim_messages")
-        .update({ seen_by_staff: true })
-        .eq("claim_id", claim.id)
-        .neq("sender_uid", u.user?.id ?? "");
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [claim.id]);
-
-  // realtime subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel(`claim_messages:claim:${claim.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "claim_messages",
-          filter: `claim_id=eq.${claim.id}`,
-        },
-        (payload) => {
-          setMsgs((m) => [...m, payload.new as ChatMessage]);
-          if (meIsStaff) {
-            const row = payload.new as ChatMessage;
-            if (row.sender_uid !== myUid) {
-              supabase
-                .from("claim_messages")
-                .update({ seen_by_staff: true })
-                .eq("id", row.id);
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [claim.id, meIsStaff, myUid]);
-
-  // autoscroll
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: 1e9, behavior: "smooth" });
-  }, [msgs.length]);
-
-  async function send() {
-    const text = input.trim();
-    if (!text || !myUid) return;
-    setBusy(true);
-
-    const optimistic: ChatMessage = {
-      id: Date.now(),
-      claim_id: claim.id,
-      sender_uid: myUid,
-      sender_role: meIsStaff ? "staff" : "claimant",
-      body: text,
-      created_at: new Date().toISOString(),
-      seen_by_claimant: meIsStaff ? false : true,
-      seen_by_staff: meIsStaff ? true : false,
-    };
-    setMsgs((m) => [...m, optimistic]);
-    setInput("");
-
-    const { data, error } = await supabase
-      .from("claim_messages")
-      .insert({
-        claim_id: claim.id,
-        sender_uid: myUid,
-        sender_role: meIsStaff ? "staff" : "claimant",
-        body: text,
-        seen_by_claimant: meIsStaff ? false : true,
-        seen_by_staff: meIsStaff ? true : false,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      setMsgs((m) => m.filter((x) => x.id !== optimistic.id));
-      alert(`Send failed: ${error.message}`);
-      setInput(text);
-      setBusy(false);
-      return;
-    }
-
-    await logEvent("message_sent", "message", data?.id ?? null, {
-      claim_id: claim.id,
-    });
-
-    setBusy(false);
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  }
-
-  return (
-    <Portal>
-      <div className="fixed inset-0 z-[100]">
-        <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-screen items-center justify-center p-4">
-            <div className="flex w-[95%] max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-              <div
-                className="flex items-center justify-between px-4 py-3 text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-                }}
-              >
-                <div className="text-sm">
-                  <div className="font-semibold">Claim #{claim.id}</div>
-                  <div className="text-white/80">
-                    {(claim as any).claimant_name} (
-                    {(claim as any).claimant_email})
-                  </div>
-                </div>
-                <button
-                  className="rounded px-3 py-1 text-sm text-white hover:bg-white/10"
-                  onClick={onClose}
-                >
-                  Close
-                </button>
-              </div>
-
-              {/* messages */}
-              <div
-                ref={listRef}
-                className="max-h-[60vh] min-h-[40vh] overflow-y-auto bg-gray-50 p-4"
-              >
-                {msgs.length === 0 && (
-                  <div className="py-10 text-center text-sm text-gray-500">
-                    No messages yet. Say hi 👋
-                  </div>
-                )}
-                <div className="space-y-2">
-                  {msgs.map((m) => {
-                    const mine = m.sender_uid === myUid;
-                    return (
-                      <div
-                        key={m.id}
-                        className={`flex ${
-                          mine ? "justify-end" : "justify-start"
-                        }`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
-                            mine
-                              ? "bg-indigo-600 text-white"
-                              : "bg-white text-gray-800 border border-gray-200"
-                          }`}
-                        >
-                          <div className="whitespace-pre-wrap">{m.body}</div>
-                          <div
-                            className={`mt-1 text-[10px] ${
-                              mine ? "text-white/80" : "text-gray-500"
-                            }`}
-                          >
-                            {new Date(m.created_at).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* composer */}
-              <div className="border-t border-gray-200 p-3">
-                <textarea
-                  className="h-20 w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
-                  placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  disabled={busy}
-                />
-                <div className="mt-2 flex items-center justify-end">
-                  <button
-                    onClick={send}
-                    disabled={busy || input.trim().length === 0}
-                    className="rounded-full bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white shadow disabled:opacity-60"
-                  >
-                    {busy ? "Sending…" : "Send"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Portal>
   );
 }
