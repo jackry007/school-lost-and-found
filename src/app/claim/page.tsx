@@ -124,9 +124,6 @@ function LoginPrompt({ backHref }: { backHref: string }) {
         Sign in with your school account to submit a claim.
       </p>
       <div className="mt-4 flex gap-3">
-        <button type="button" onClick={openHeaderLogin} className="btn">
-          Sign in (opens panel)
-        </button>
         <Link
           href={backHref}
           className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"
