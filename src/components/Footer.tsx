@@ -125,7 +125,6 @@ export default function Footer() {
                 ["Privacy", "/privacy"],
                 ["Terms of Use", "/terms"],
                 ["Safety & Reporting", "/safety"],
-                ["Sitemap", "/sitemap"],
               ].map(([label, href]) => (
                 <li key={href}>
                   <Link
