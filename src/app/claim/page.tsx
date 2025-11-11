@@ -394,7 +394,7 @@ export default function ClaimPage() {
           )}
 
           {/* Quick Messages button */}
-          {isAuthed && (
+          {/* {isAuthed && (
             <div className="mt-3">
               <button
                 type="button"
@@ -405,7 +405,7 @@ export default function ClaimPage() {
                 Open Messages
               </button>
             </div>
-          )}
+          )} */}
         </header>
 
         {/* aria-live region for a11y */}
@@ -623,14 +623,14 @@ export default function ClaimPage() {
                   </button>
                 </p>
                 <div className="flex gap-3">
-                  <Link
+                  {/* <Link
                     href={`${BASE}/claim?item=${encodeURIComponent(
                       String(itemId)
                     )}&chat=1`}
                     className="inline-flex items-center justify-center rounded-lg bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99]"
                   >
                     Open Messages
-                  </Link>
+                  </Link> */}
                   <Link
                     href={backToSearchHref}
                     className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"

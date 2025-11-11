@@ -699,7 +699,7 @@ export default function AdminPage() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                {/* Pending Items (Top 3) */}
+                {/* Pending Items (Top 5) */}
                 <Card className="p-0">
                   <div className="flex items-center justify-between p-4">
                     <div className="font-medium">
@@ -708,9 +708,9 @@ export default function AdminPage() {
                         ({pendingItems.length})
                       </span>
                     </div>
-                    {pendingItems.length > 3 && (
+                    {pendingItems.length > 5 && (
                       <span className="text-xs text-gray-500 pr-2">
-                        showing 3
+                        showing 5
                       </span>
                     )}
                   </div>
@@ -720,15 +720,22 @@ export default function AdminPage() {
                         No pending items.
                       </div>
                     ) : (
-                      pendingItems.slice(0, 3).map((it) => (
+                      pendingItems.slice(0, 5).map((it) => (
                         <Row key={it.id} className="px-3 py-2">
-                          <div className="flex items-center">
+                          <div className="flex min-w-0 items-center gap-3">
                             <Thumb src={thumbMap[it.id]} alt={it.title} />
                             <RowInfo
-                              title={`#${it.id} · ${it.title}`}
-                              meta={`${it.category ?? "—"} · ${
-                                (it as any).location ?? "—"
-                              }`}
+                              title={
+                                <span className="block truncate max-w-[18rem] sm:max-w-[24rem]">
+                                  #{it.id} · {it.title}
+                                </span>
+                              }
+                              meta={
+                                <span className="block truncate text-gray-600">
+                                  {it.category ?? "—"} ·{" "}
+                                  {(it as any).location ?? "—"}
+                                </span>
+                              }
                             />
                           </div>
                           <RowActions>
@@ -846,9 +853,9 @@ export default function AdminPage() {
                               >
                                 Approve
                               </Btn>
-                              <Btn tone="ghost" onClick={() => onAskInfo(c)}>
+                              {/* <Btn tone="ghost" onClick={() => onAskInfo(c)}>
                                 Ask Info
-                              </Btn>
+                              </Btn> */}
                               <Btn
                                 tone="danger"
                                 onClick={() => onRejectClaim(c)}
@@ -899,141 +906,6 @@ export default function AdminPage() {
         {/* -------- Queues -------- */}
         {tab === "Queues" && (
           <div className="space-y-8 mt-4">
-            {/* Pending Items */}
-            <section className="space-y-3">
-              <SectionHeading>
-                Pending Items <Badge tone="amber">{pendingItems.length}</Badge>
-              </SectionHeading>
-              <div className="space-y-3">
-                {pendingItems.length === 0 && (
-                  <EmptyRow text="No pending items." />
-                )}
-                {pendingItems.map((it) => (
-                  <Row key={it.id}>
-                    <div className="flex items-center">
-                      <Thumb src={thumbMap[it.id]} alt={it.title} />
-                      <RowInfo
-                        title={`#${it.id} · ${it.title}`}
-                        meta={`${it.category ?? "—"} · ${
-                          (it as any).location ?? "—"
-                        } · submitted ${new Date(
-                          it.created_at
-                        ).toLocaleString()}`}
-                      />
-                    </div>
-                    <RowActions>
-                      <Btn tone="primary" onClick={() => askApprove(it)}>
-                        Approve &amp; List
-                      </Btn>
-                      <Btn
-                        tone="danger"
-                        onClick={() => updateItemStatus(it.id, "rejected")}
-                      >
-                        Reject
-                      </Btn>
-                      <Btn tone="ghost" onClick={() => openEdit(it)}>
-                        Edit
-                      </Btn>
-                    </RowActions>
-                  </Row>
-                ))}
-              </div>
-            </section>
-
-            {/* Pending Claims */}
-            <section className="space-y-3">
-              <SectionHeading>
-                Pending Claims{" "}
-                <Badge tone="amber">{pendingClaims.length}</Badge>
-              </SectionHeading>
-              <div className="space-y-3">
-                {pendingClaims.length === 0 && (
-                  <EmptyRow text="No pending claims." />
-                )}
-
-                {pendingClaims.map((c) => {
-                  const t = claimThumbs[c.id];
-                  const sched = (c as any).schedule_at as
-                    | string
-                    | null
-                    | undefined;
-                  const schedChip = sched
-                    ? new Date(sched).toLocaleString()
-                    : null;
-
-                  return (
-                    <Row key={c.id}>
-                      <div className="flex min-w-0 items-center gap-3">
-                        <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
-                        <RowInfo
-                          title={
-                            <>
-                              Claim #{c.id} → Item #{c.item_id}
-                              {schedChip && (
-                                <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800">
-                                  {schedChip}
-                                </span>
-                              )}
-                            </>
-                          }
-                          meta={
-                            <>
-                              {(c as any).claimant_name} (
-                              {(c as any).claimant_email})
-                              {(c as any).proof && (
-                                <>
-                                  {" "}
-                                  ·{" "}
-                                  <span className="text-gray-500">
-                                    proof attached
-                                  </span>
-                                </>
-                              )}
-                            </>
-                          }
-                        />
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2">
-                        {t?.proofs?.length > 0 && (
-                          <button
-                            className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                            onClick={() =>
-                              openPhotos(
-                                `Proof photos — Claim #${c.id}`,
-                                t.proofs
-                              )
-                            }
-                            title="View proof photos"
-                          >
-                            View Proofs ({t.proofs.length})
-                          </button>
-                        )}
-
-                        <Btn tone="ghost" onClick={() => openChat(c)}>
-                          Message
-                        </Btn>
-
-                        <Btn tone="ghost" onClick={() => openSchedule(c)}>
-                          {schedChip ? "Reschedule" : "Schedule"}
-                        </Btn>
-
-                        <Btn tone="primary" onClick={() => onApproveClaim(c)}>
-                          Approve
-                        </Btn>
-                        <Btn tone="ghost" onClick={() => onAskInfo(c)}>
-                          Ask Info
-                        </Btn>
-                        <Btn tone="danger" onClick={() => onRejectClaim(c)}>
-                          Reject
-                        </Btn>
-                      </div>
-                    </Row>
-                  );
-                })}
-              </div>
-            </section>
-
             {/* Filters + items */}
             <section className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1081,15 +953,19 @@ export default function AdminPage() {
                   const s = it.status as ItemStatusWidened;
                   return (
                     <Row key={it.id}>
-                      <div className="flex items-center">
+                      <div className="flex min-w-0 items-center">
                         <Thumb src={thumbMap[it.id]} alt={it.title} />
                         <RowInfo
-                          title={`#${it.id} · ${it.title}`}
+                          title={
+                            <span className="block truncate max-w-[18rem] sm:max-w-[28rem]">
+                              #{it.id} · {it.title}
+                            </span>
+                          }
                           meta={
-                            <>
+                            <span className="block truncate">
                               <StatusBadge status={s} /> · {it.category ?? "—"}{" "}
                               · {(it as any).location ?? "—"}
-                            </>
+                            </span>
                           }
                         />
                       </div>
