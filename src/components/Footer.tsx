@@ -8,6 +8,8 @@ const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
 const NAVY_DARKMODE = "#1E407A"; // slightly brighter for dark contrast
 
+import logo from "../../public/images/cherry-creek-logo.png";
+
 export default function Footer() {
   const year = useMemo(() => new Date().getFullYear(), []);
   const ringColor = `color-mix(in oklab, ${CREEK_NAVY} 88%, white)`;
@@ -39,7 +41,7 @@ export default function Footer() {
                 style={{ ["--tw-ring-color" as any]: ringColor }}
               >
                 <Image
-                  src={"/images/cherry-creek-logo.png"}
+                  src={logo}
                   alt="Cherry Creek High School logo"
                   width={88}
                   height={88}
