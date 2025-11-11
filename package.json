@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-
+    "clean": "rimraf .next out",
     "build:gh": "cross-env GH_PAGES=true next build",
-    "deploy": "npm run build:gh && mkdir -p out && echo > out/.nojekyll && gh-pages -d out -b gh-pages"
+    "deploy": "npm run clean && npm run build:gh && node -e \"require('fs').mkdirSync('out',{recursive:true}); require('fs').writeFileSync('out/.nojekyll','');\" && gh-pages -d out -b gh-pages"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -37,6 +37,7 @@
     "gh-pages": "^6.3.0",
     "lightningcss": "^1.30.2",
     "postcss": "^8.5.6",
+    "rimraf": "^6.1.0",
     "tailwindcss": "^3.4.18",
     "typescript": "^5"
   }

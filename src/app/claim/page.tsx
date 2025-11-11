@@ -9,7 +9,7 @@
  * - If the page is opened with ?chat=1, auto-open ChatModal with the user's latest claim for that item
  */
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { Suspense, useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -135,8 +135,17 @@ function LoginPrompt({ backHref }: { backHref: string }) {
   );
 }
 
-/* ========= Page ========= */
+/* ========= Export with Suspense ========= */
 export default function ClaimPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <ClaimPageInner />
+    </Suspense>
+  );
+}
+
+/* ========= Inner page (uses useSearchParams) ========= */
+function ClaimPageInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const itemId = useMemo(() => sp.get("item")?.trim() ?? "", [sp]);
@@ -261,15 +270,13 @@ export default function ClaimPage() {
 
   /* ===== Open chat helper (latest claim for this user+item) ===== */
   const openLatestChat = useCallback(async () => {
-    if (!currentUid || !item?.id) {
-      console.warn("[openLatestChat] missing uid or item.id");
-      return;
-    }
+    if (!currentUid || !item?.id) return;
 
     const { data: cl, error } = await supabase
       .from("claims")
       .select(
-        "id,item_id,claimant_name,claimant_email,claimant_uid,status,created_at as updated_at:created_at"
+        // alias created_at so ChatModal can rely on `updated_at`
+        "id,item_id,claimant_name,claimant_email,claimant_uid,status,created_at as updated_at"
       )
       .eq("item_id", Number(item.id))
       .eq("claimant_uid", currentUid)
@@ -284,17 +291,16 @@ export default function ClaimPage() {
     if (cl) {
       setChatClaim(cl);
       setChatOpen(true);
-    } else {
-      console.warn("[openLatestChat] no claim found for this user+item");
     }
   }, [currentUid, item?.id]);
 
   /* ===== Auto-open chat if ?chat=1 ===== */
-  // useEffect(() => {
-  //   if (wantsChat && isAuthed && item?.id) {
-  //     openLatestChat();
-  //   }
-  // }, [wantsChat, isAuthed, item?.id, openLatestChat]);
+  useEffect(() => {
+    if (wantsChat && isAuthed && item?.id) {
+      // small microtask delay to ensure state is settled
+      Promise.resolve().then(openLatestChat);
+    }
+  }, [wantsChat, isAuthed, item?.id, openLatestChat]);
 
   /* ===== Submit ===== */
   async function onSubmit(e: React.FormEvent) {
@@ -321,12 +327,11 @@ export default function ClaimPage() {
       const newId = inserted?.id ?? null;
       setSubmittedId(newId);
 
-      // 🚀 Immediately take the student to their thread (query-param version)
-      // We intentionally navigate to ?chat=1 (not /claim/[id]) to keep static export happy.
+      // After submit we intentionally route to ?chat=1 so the student lands in the message thread.
       router.push(
         `${BASE}/claim?item=${encodeURIComponent(String(item.id))}&chat=1`
       );
-      return; // prevent showing the fallback success screen
+      return;
     } catch (e: any) {
       setErr(e?.message || "Failed to submit claim.");
       setTimeout(() => document.getElementById("error-box")?.focus(), 0);
@@ -391,20 +396,6 @@ export default function ClaimPage() {
               {item.status && <StatusPill>{item.status}</StatusPill>}
             </div>
           )}
-
-          {/* Quick Messages button */}
-          {/* {isAuthed && (
-            <div className="mt-3">
-              <button
-                type="button"
-                className="rounded-xl border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50"
-                onClick={openLatestChat}
-                title="Open Messages"
-              >
-                Open Messages
-              </button>
-            </div>
-          )} */}
         </header>
 
         {/* aria-live region for a11y */}
@@ -622,14 +613,6 @@ export default function ClaimPage() {
                   </button>
                 </p>
                 <div className="flex gap-3">
-                  {/* <Link
-                    href={`${BASE}/claim?item=${encodeURIComponent(
-                      String(itemId)
-                    )}&chat=1`}
-                    className="inline-flex items-center justify-center rounded-lg bg-[#BF1E2E] px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99]"
-                  >
-                    Open Messages
-                  </Link> */}
                   <Link
                     href={backToSearchHref}
                     className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50"

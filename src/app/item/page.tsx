@@ -1,6 +1,7 @@
+// /app/item/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -9,7 +10,6 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const BUCKET = "item-photos";
-// IMPORTANT: prefix local assets with BASE so GH Pages finds them
 const FALLBACK_IMG = `${BASE}/no-image.png`;
 
 type Row = {
@@ -26,7 +26,7 @@ type Row = {
 
 function publicUrlFromPath(path?: string | null) {
   if (!path) return FALLBACK_IMG;
-  if (/^https?:\/\//i.test(path)) return path; // already absolute
+  if (/^https?:\/\//i.test(path)) return path;
   return `${SB_URL}/storage/v1/object/public/${BUCKET}/${path}`;
 }
 
@@ -43,7 +43,25 @@ async function fetchItem(id: string): Promise<Row | null> {
   return rows?.[0] ?? null;
 }
 
+/** Outer page: Suspense wrapper satisfies Next 15 CSR bailout rules */
 export default function ItemPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-5xl px-4 py-8">
+          <div className="rounded-xl border bg-white p-6 shadow-sm">
+            Loading item…
+          </div>
+        </main>
+      }
+    >
+      <ItemPageInner />
+    </Suspense>
+  );
+}
+
+/** Inner page: the only place we call useSearchParams() */
+function ItemPageInner() {
   const sp = useSearchParams();
   const id = useMemo(() => sp.get("id")?.trim() ?? "", [sp]);
 
@@ -123,6 +141,9 @@ export default function ItemPage() {
               src={img}
               alt={title}
               className="h-[420px] w-full rounded-xl bg-gray-50 object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG;
+              }}
             />
           </div>
 
