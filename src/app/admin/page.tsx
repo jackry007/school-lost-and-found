@@ -670,23 +670,7 @@ export default function AdminPage() {
                 </Card>
               </div>
 
-              <Card className="mt-4 p-4">
-                <div className="mb-2 text-xs text-gray-500">
-                  Top locations (30d)
-                </div>
-                {topLocs.length ? (
-                  <ul className="grid gap-1 text-sm sm:grid-cols-2">
-                    {topLocs.map(([k, v]) => (
-                      <li key={k} className="flex justify-between">
-                        <span className="truncate">{k}</span>
-                        <span className="ml-2 text-gray-700">{v}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-sm text-gray-600">—</div>
-                )}
-              </Card>
+              
             </section>
 
             {/* NEW: Pending Snapshots */}
