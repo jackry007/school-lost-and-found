@@ -39,7 +39,7 @@ export default function Footer() {
                 style={{ ["--tw-ring-color" as any]: ringColor }}
               >
                 <Image
-                  src="/images/cherry-creek-logo.png"
+                  src={"/images/cherry-creek-logo.png"}
                   alt="Cherry Creek High School logo"
                   width={88}
                   height={88}
