@@ -269,21 +269,20 @@ export default function ClaimPage() {
     const { data: cl, error } = await supabase
       .from("claims")
       .select(
-        "id,item_id,claimant_name,claimant_email,claimant_uid,status,created_at,updated_at"
+        "id,item_id,claimant_name,claimant_email,claimant_uid,status,created_at as updated_at:created_at"
       )
-      .eq("item_id", Number(item.id)) // ✅ force int match
-      .eq("claimant_uid", currentUid) // ✅ uuid match
+      .eq("item_id", Number(item.id))
+      .eq("claimant_uid", currentUid)
       .order("created_at", { ascending: false })
-      .limit(1);
+      .limit(1)
+      .single<ChatClaim>();
 
     if (error) {
       console.error("[openLatestChat] select error:", error.message);
       return;
     }
-
-    if (cl && cl.length > 0) {
-      console.log("[openLatestChat] found claim", cl[0]);
-      setChatClaim(cl[0] as ChatClaim);
+    if (cl) {
+      setChatClaim(cl);
       setChatOpen(true);
     } else {
       console.warn("[openLatestChat] no claim found for this user+item");
@@ -291,11 +290,11 @@ export default function ClaimPage() {
   }, [currentUid, item?.id]);
 
   /* ===== Auto-open chat if ?chat=1 ===== */
-  useEffect(() => {
-    if (wantsChat && isAuthed && item?.id) {
-      openLatestChat();
-    }
-  }, [wantsChat, isAuthed, item?.id, openLatestChat]);
+  // useEffect(() => {
+  //   if (wantsChat && isAuthed && item?.id) {
+  //     openLatestChat();
+  //   }
+  // }, [wantsChat, isAuthed, item?.id, openLatestChat]);
 
   /* ===== Submit ===== */
   async function onSubmit(e: React.FormEvent) {
