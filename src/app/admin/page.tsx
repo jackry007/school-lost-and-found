@@ -145,6 +145,8 @@ export default function AdminPage() {
   const [tab, setTab] = useState<AdminTab>("Overview");
   const [logLoadedOnce, setLogLoadedOnce] = useState(false);
   const [logPage, setLogPage] = useState(1); // pages of 50
+  const [logHasMore, setLogHasMore] = useState(true);
+  const PAGE_SIZE = 100;
 
   /* ---------------- Auth + load ---------------- */
   const load = async () => {
@@ -186,15 +188,34 @@ export default function AdminPage() {
     setLoading(false);
   };
 
-  async function loadLog() {
+  async function loadActivity({ reset = false }: { reset?: boolean } = {}) {
     setLogLoading(true);
+
+    const start = reset ? 0 : logRows.length; // ok to read length once
+    const end = start + PAGE_SIZE - 1;
+
     const { data, error } = await supabase
-      .from("audit_log")
+      .from("v_activity_unified")
       .select("*")
-      .order("at", { ascending: false })
-      .limit(200);
-    if (!error && data) setLogRows(data as AuditRow[]);
+      .order("occurred_at", { ascending: false })
+      .range(start, end);
+
+    if (error) {
+      console.error("activity fetch failed:", error);
+      setLogLoading(false);
+      setLogLoadedOnce(true);
+      return;
+    }
+
+    setLogRows((prev) => (reset ? data ?? [] : [...prev, ...(data ?? [])]));
+    setLogHasMore((data?.length ?? 0) === PAGE_SIZE);
     setLogLoading(false);
+    setLogLoadedOnce(true);
+  }
+
+  async function loadMoreActivity() {
+    if (!logHasMore || logLoading) return;
+    await loadActivity({ reset: false });
   }
 
   useEffect(() => {
@@ -203,7 +224,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (tab === "Activity" && !logLoadedOnce) {
-      loadLog().then(() => setLogLoadedOnce(true));
+      void loadActivity({ reset: true });
     }
   }, [tab, logLoadedOnce]);
 
@@ -601,7 +622,7 @@ export default function AdminPage() {
         {tab === "Overview" && (
           <div className="space-y-8 mt-4">
             {/* Quick Actions Row */}
-            <Card className="p-4">
+            {/* <Card className="p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-700">
                   <span className="font-medium">Pickup Desk:</span> Enter a
@@ -625,7 +646,7 @@ export default function AdminPage() {
                   </Btn>
                 </form>
               </div>
-            </Card>
+            </Card> */}
 
             {/* Analytics */}
             <section>
@@ -669,8 +690,6 @@ export default function AdminPage() {
                   )}
                 </Card>
               </div>
-
-              
             </section>
 
             {/* NEW: Pending Snapshots */}
@@ -1023,11 +1042,12 @@ export default function AdminPage() {
         )}
 
         {/* -------- Activity -------- */}
+        {/* -------- Activity -------- */}
         {tab === "Activity" && (
           <section className="space-y-3 mt-4">
             <SectionHeading>Activity Log</SectionHeading>
             <Card>
-              {!logLoadedOnce || logLoading ? (
+              {!logLoadedOnce && logLoading ? (
                 <div className="p-4 text-sm text-gray-500">Loading…</div>
               ) : logRows.length === 0 ? (
                 <div className="p-6 text-center text-sm text-gray-600">
@@ -1036,20 +1056,24 @@ export default function AdminPage() {
               ) : (
                 <>
                   <ul className="divide-y">
-                    {logRows.slice(0, logPage * 50).map((r) => (
-                      <CompactLogRow key={r.id} row={r} />
+                    {logRows.map((r: any) => (
+                      <CompactLogRow key={r.event_id ?? r.id} row={r} />
                     ))}
                   </ul>
-                  {logRows.length > logPage * 50 && (
-                    <div className="p-3 flex justify-center">
-                      <Btn
-                        tone="ghost"
-                        onClick={() => setLogPage((p) => p + 1)}
-                      >
+
+                  <div className="p-3 flex justify-center">
+                    {logLoading ? (
+                      <div className="text-sm text-gray-500">Loading…</div>
+                    ) : logHasMore ? (
+                      <Btn tone="ghost" onClick={loadMoreActivity}>
                         Load more
                       </Btn>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-xs text-gray-400">
+                        End of results
+                      </span>
+                    )}
+                  </div>
                 </>
               )}
             </Card>
@@ -1237,11 +1261,26 @@ export default function AdminPage() {
 }
 
 /* ===================== Compact Activity Row ===================== */
-function CompactLogRow({ row }: { row: AuditRow }) {
+
+function renderDetails(action: string, details: any) {
+  if (!details) return null;
+
+  if (details.item_id) return `Item #${details.item_id}`;
+  if (details.claim_id) return `Claim #${details.claim_id}`;
+  if (details.pickup_code) return `Pickup code: ${details.pickup_code}`;
+
+  return Object.entries(details)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+}
+
+function CompactLogRow({ row }: { row: any }) {
+  const ts = row.occurred_at ?? row.at;
   const detailsText =
-    row?.details && Object.keys(row.details).length
+    row?.details && Object.keys(row.details || {}).length
       ? JSON.stringify(row.details)
       : "—";
+  const who = row.actor_name ?? row.actor_uid ?? null;
 
   return (
     <li className="px-3 py-2 flex items-start justify-between gap-3 text-[13px]">
@@ -1253,17 +1292,17 @@ function CompactLogRow({ row }: { row: AuditRow }) {
         <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-blue-800">
           {row.action}
         </span>
-        <div className="min-w-0 truncate text-gray-800" title={detailsText}>
-          {detailsText}
+        <div className="min-w-0 truncate text-gray-700">
+          {renderDetails(row.action, row.details)}
         </div>
-        {row.actor_uid && (
+        {who && (
           <span className="shrink-0 text-[11px] text-gray-500 ml-1">
-            · {row.actor_uid}
+            · {who}
           </span>
         )}
       </div>
       <div className="shrink-0 text-[11px] text-gray-500">
-        {new Date(row.at).toLocaleString()}
+        {ts ? new Date(ts).toLocaleString() : ""}
       </div>
     </li>
   );

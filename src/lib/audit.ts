@@ -1,3 +1,4 @@
+// src/lib/audit.ts
 import { supabase } from "@/lib/supabaseClient";
 
 export type AuditAction =
@@ -17,16 +18,28 @@ export async function logEvent(
   action: AuditAction,
   entityType: "item" | "claim" | "message",
   entityId: number | null,
-  details?: Record<string, any>
+  details: Record<string, any> = {}
 ) {
-  const userAgent =
-    typeof navigator !== "undefined" ? navigator.userAgent : null;
-  const { error } = await supabase.from("audit_log").insert({
-    action,
-    entity_type: entityType,
-    entity_id: entityId,
-    details: details ?? {},
-    user_agent: userAgent,
-  });
-  if (error) console.warn("audit log insert failed:", error.message);
+  try {
+    const { data: userRes } = await supabase.auth.getUser();
+    const actor_uid = userRes?.user?.id ?? null;
+
+    const user_agent =
+      typeof navigator !== "undefined" ? navigator.userAgent : null;
+
+    const { error } = await supabase.from("audit_log").insert({
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      details,
+      user_agent,
+      actor_uid, 
+    });
+
+    if (error) {
+      console.warn("audit log insert failed:", error.message);
+    }
+  } catch (err) {
+    console.warn("audit log insert failed:", err);
+  }
 }
