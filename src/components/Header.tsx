@@ -136,9 +136,7 @@ export function Header() {
     () => [
       { href: "/", label: "Lost & Found" },
       { href: "/report", label: "Report Found Item" },
-      ...(role === "admin" || role === "staff"
-        ? [{ href: "/admin", label: "Admin" }]
-        : []),
+      { href: "/admin", label: "Admin" },
     ],
     [role]
   );
