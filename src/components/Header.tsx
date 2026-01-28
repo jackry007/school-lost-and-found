@@ -1,11 +1,13 @@
+// src/components/Header.tsx
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import MessagesPortal from "@/components/MessagesPortal";
+import { useAuthUI } from "@/components/AuthUIProvider";
 
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
@@ -27,6 +29,8 @@ type ProfileRole = "admin" | "staff" | "user";
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+
   const [scrolled, setScrolled] = useState(false);
   const [showNotice, setShowNotice] = useState<null | boolean>(null);
 
@@ -35,9 +39,13 @@ export function Header() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [role, setRole] = useState<ProfileRole | null>(null);
 
-  // login panel
-  const [panelOpen, setPanelOpen] = useState(false);
+  // ✅ Shared panel state via provider (so other pages can open it)
+  const { panelOpen, openPanel, closePanel, redirectTo, clearRedirect } =
+    useAuthUI();
+
+  // login panel DOM ref for click-outside
   const panelRef = useRef<HTMLDivElement>(null);
+
   const [emailInput, setEmailInput] = useState("");
   const [pwdInput, setPwdInput] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -63,35 +71,73 @@ export function Header() {
       const u = data.session?.user ?? null;
       setAuth(u ? "authed" : "guest");
       setUserEmail(u?.email ?? null);
-      if (!u) return;
+
+      if (!u) {
+        setRole(null);
+        return;
+      }
+
       // fetch role from profiles
       const { data: prof } = await supabase
         .from("profiles")
         .select("role")
         .eq("uid", u.id)
         .single();
+
       setRole((prof?.role as ProfileRole) ?? "user");
     };
+
     loadAuth();
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      const u = session?.user ?? null;
-      setAuth(u ? "authed" : "guest");
-      setUserEmail(u?.email ?? null);
-      if (u) setPanelOpen(false);
-    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (_evt, session) => {
+        const u = session?.user ?? null;
+        setAuth(u ? "authed" : "guest");
+        setUserEmail(u?.email ?? null);
+
+        if (!u) {
+          setRole(null);
+          return;
+        }
+
+        // close panel on successful auth
+        closePanel();
+
+        // refresh role
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("uid", u.id)
+          .single();
+
+        setRole((prof?.role as ProfileRole) ?? "user");
+      },
+    );
+
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [closePanel]);
 
   // Click outside login panel
   useEffect(() => {
     if (!panelOpen) return;
+
     function onClick(e: MouseEvent) {
       if (!panelRef.current) return;
-      if (!panelRef.current.contains(e.target as Node)) setPanelOpen(false);
+      if (!panelRef.current.contains(e.target as Node)) closePanel();
     }
+
     window.addEventListener("mousedown", onClick);
     return () => window.removeEventListener("mousedown", onClick);
-  }, [panelOpen]);
+  }, [panelOpen, closePanel]);
+
+  // ✅ Guarded navigation: if guest -> open login panel and remember target
+  function guardedGo(targetHref: string) {
+    if (auth === "authed") {
+      router.push(targetHref);
+      return;
+    }
+    openPanel(targetHref);
+  }
 
   // Handle login
   async function handleLogin(e: React.FormEvent) {
@@ -113,40 +159,53 @@ export function Header() {
     // ✅ Fetch role immediately after login (no refresh needed)
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
+
     if (uid) {
       const { data: prof } = await supabase
         .from("profiles")
         .select("role")
         .eq("uid", uid)
         .single();
-      if (prof?.role) setRole(prof.role);
+
+      setRole((prof?.role as ProfileRole) ?? "user");
     }
 
     setEmailInput("");
     setPwdInput("");
-    setPanelOpen(false);
+    closePanel();
+
+    // ✅ If they clicked a protected link before signing in, send them there now
+    if (redirectTo) {
+      const to = redirectTo;
+      clearRedirect();
+      router.push(to);
+    }
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    window.location.reload();
+    setRole(null);
+    setUserEmail(null);
+    setAuth("guest");
+    router.push("/");
   }
 
+  // Nav items (you can also hide Admin unless role allows)
   const nav = useMemo(
     () => [
-      { href: "/", label: "Lost & Found" },
-      { href: "/report", label: "Report Found Item" },
-      { href: "/admin", label: "Admin" },
+      { href: "/", label: "Lost & Found", guard: false },
+      { href: "/report", label: "Report Found Item", guard: true },
+      { href: "/admin", label: "Admin", guard: true },
     ],
-    [role]
+    [],
   );
 
   return (
     <>
-      {/* Top Bar */}
+      {/* ✅ ONLY THIS RED BAR IS STICKY */}
       <header
         className={[
-          "sticky top-0 z-40 text-white transition-all duration-300",
+          "sticky top-0 z-50 text-white transition-all duration-300", // z-50 helps it stay above hero overlays
           scrolled
             ? "shadow-[0_6px_18px_rgba(0,0,0,.18)]"
             : "shadow-[0_10px_28px_rgba(0,0,0,.12)]",
@@ -186,6 +245,39 @@ export function Header() {
             <nav className="hidden md:flex items-center gap-1.5">
               {nav.map((n) => {
                 const active = pathname === n.href;
+
+                if (n.guard) {
+                  return (
+                    <button
+                      key={n.href}
+                      type="button"
+                      onClick={() => guardedGo(n.href)}
+                      aria-current={active ? "page" : undefined}
+                      className={[
+                        "relative group rounded-full px-4 py-2 text-sm font-semibold transition",
+                        active
+                          ? "bg-yellow-400 text-red-900 shadow-[inset_0_-2px_0_rgba(0,0,0,.25)]"
+                          : "text-white/90 hover:bg-white/15 hover:text-white",
+                      ].join(" ")}
+                    >
+                      {n.label}
+                      <span
+                        className={[
+                          "pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-1 h-[3px] w-10 rounded-full transition-all",
+                          active
+                            ? "opacity-100 scale-100"
+                            : "opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100",
+                        ].join(" ")}
+                        style={{
+                          backgroundColor: active
+                            ? "#6E0F16"
+                            : "rgba(255,255,255,.9)",
+                        }}
+                      />
+                    </button>
+                  );
+                }
+
                 return (
                   <Link
                     key={n.href}
@@ -220,9 +312,10 @@ export function Header() {
 
           {/* Right: Search + Auth / Messaging */}
           <div className="relative flex items-center gap-3">
-            {/* Search chip */}
-            <Link
-              href="/search"
+            {/* Search chip (guarded) */}
+            <button
+              type="button"
+              onClick={() => guardedGo("/search")}
               className={[
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
                 "border border-white/30 bg-white/10 hover:bg-white/18",
@@ -233,9 +326,8 @@ export function Header() {
             >
               <Search size={18} />
               <span className="hidden sm:inline">Search</span>
-            </Link>
+            </button>
 
-            {/* Auth UI */}
             {auth === "loading" && (
               <span className="rounded-full px-3 py-2 text-sm border border-white/30 bg-white/10">
                 Checking…
@@ -246,7 +338,7 @@ export function Header() {
               <div className="relative" ref={panelRef}>
                 <button
                   type="button"
-                  onClick={() => setPanelOpen((v) => !v)}
+                  onClick={() => (panelOpen ? closePanel() : openPanel())}
                   className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border border-white/30 bg-white/10 hover:bg-white/18 focus:outline-none focus:ring-2 focus:ring-white/60 transition"
                   aria-expanded={panelOpen}
                   aria-controls="login-panel"
@@ -260,7 +352,7 @@ export function Header() {
                     className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/25 bg-white/95 text-gray-900 shadow-xl backdrop-blur p-4"
                   >
                     <h3 className="text-sm font-semibold text-gray-800">
-                      Sign in to claim items
+                      Sign in to continue
                     </h3>
                     <p className="mt-1 text-xs text-gray-600">
                       Use your <b>@cherrycreekschools.org</b> email.
@@ -302,7 +394,7 @@ export function Header() {
                     <button
                       className="absolute right-2 top-2 rounded p-1 text-gray-500 hover:bg-gray-100"
                       aria-label="Close"
-                      onClick={() => setPanelOpen(false)}
+                      onClick={closePanel}
                     >
                       <X size={16} />
                     </button>
@@ -313,7 +405,6 @@ export function Header() {
 
             {auth === "authed" && (
               <div className="flex items-center gap-2">
-                {/* 💬 Messaging Portal */}
                 <MessagesPortal />
 
                 <span
@@ -341,7 +432,7 @@ export function Header() {
         />
       </header>
 
-      {/* Creek Ribbon */}
+      {/* These scroll normally (NOT sticky) */}
       <div
         className="h-8 w-full shadow-[inset_0_-1px_0_rgba(0,0,0,.08)]"
         style={{
@@ -350,7 +441,6 @@ export function Header() {
         }}
       />
 
-      {/* ⚠️ Dismissible Notice */}
       {showNotice === true && (
         <div
           role="region"
@@ -368,7 +458,7 @@ export function Header() {
               try {
                 window.localStorage.setItem(
                   NOTICE_NEXT_SHOW_KEY,
-                  String(Date.now() + ONE_DAY_MS)
+                  String(Date.now() + ONE_DAY_MS),
                 );
               } catch {}
             }}

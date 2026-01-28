@@ -2,34 +2,21 @@
 // ------------------------------------------------------
 // 🏫 Root Layout for the School Lost & Found website
 // ------------------------------------------------------
-// This file defines the global structure, design, and metadata
-// that wrap around every page (Home, Report, Search, Admin, etc).
-//
-//
-// Every page automatically appears inside this layout’s <main> area.
-// ------------------------------------------------------
 
-import "./globals.css"; // Global styles (Tailwind + theme variables)
+import "./globals.css";
 import type { Metadata } from "next";
-import { Header } from "@/components/Header"; // Red Lost & Found header bar (navigation)
-import SchoolHeaderLogo from "@/components/SchoolHeaderLogo"; // White band with school logo
-import Footer from "@/components/Footer"; // ✅ Footer (Contact · Privacy · Terms · Language)
 
-// ------------------------------------------------------
-// 🔖 Metadata for SEO, browser tabs, and competition clarity
-// ------------------------------------------------------
-// Appears as the browser tab title and description in search engines.
+import { Header } from "@/components/Header";
+import SchoolHeaderLogo from "@/components/SchoolHeaderLogo";
+import Footer from "@/components/Footer";
+
+import { AuthUIProvider } from "@/components/AuthUIProvider";
 
 export const metadata: Metadata = {
   title: "School Lost & Found",
   description: "Report and find lost items easily.",
 };
 
-// ------------------------------------------------------
-// 🧩 RootLayout Component
-// ------------------------------------------------------
-// "children" = the current page (e.g. Home, Report, etc.)
-// Next.js automatically injects the active page into {children}.
 export default function RootLayout({
   children,
 }: {
@@ -37,24 +24,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* lang="en" helps accessibility and screen readers */}
       <body
         suppressHydrationWarning
         className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased"
       >
-        {/* White Cherry Creek logo band (top of every page) */}
-        <SchoolHeaderLogo />
+        {/* ✅ Provider wraps the WHOLE app so any page can open the Header sign-in panel */}
+        <AuthUIProvider>
+          <SchoolHeaderLogo />
+          <Header />
 
-        {/* Red Lost & Found header with navigation links */}
-        <Header />
+          <main id="main" className="py-8">
+            {children}
+          </main>
 
-        {/* Page content area */}
-        <main id="main" className="py-8">
-          {children}
-        </main>
-
-        {/* ✅ Footer appears on every page */}
-        <Footer />
+          <Footer />
+        </AuthUIProvider>
       </body>
     </html>
   );

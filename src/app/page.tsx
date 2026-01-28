@@ -1,7 +1,7 @@
 // src/app/page.tsx
 // ------------------------------------------------------
 // Cherry Creek HS Lost & Found — CCHS-branded
-// Hero + Mission + Stats + Testimonials + Stories
+// Hero + Mission + (Stats gated) + Testimonials + Stories
 // With PageShell background, Creek ribbon, denser grids.
 // ------------------------------------------------------
 
@@ -13,6 +13,9 @@ import { motion, type Variants } from "framer-motion";
 
 import { ItemCard } from "@/components/ItemCard";
 import { supabase } from "@/lib/supabaseClient";
+
+import { useRouter } from "next/navigation";
+import { useAuthUI } from "@/components/AuthUIProvider";
 
 /* ---------- Types ---------- */
 type CardItem = {
@@ -66,8 +69,43 @@ export default function HomePage() {
   const [items, setItems] = useState<CardItem[]>([]);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // ✅ Auth gating
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const router = useRouter();
+  const { openPanel } = useAuthUI();
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
+
+  // ✅ Load auth state + subscribe to changes
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (!mounted) return;
+
+      if (error) {
+        console.warn("auth.getUser error:", error.message);
+        setUser(null);
+      } else {
+        setUser(data.user ?? null);
+      }
+      setAuthLoading(false);
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   // 🧮 Live stats
@@ -78,8 +116,17 @@ export default function HomePage() {
     claimRate: 0,
   });
 
-  // Fetch public cards (only listed)
+  // ✅ Fetch cards ONLY when logged in
   useEffect(() => {
+    if (authLoading) return;
+
+    // Not logged in => hide + clear
+    if (!user) {
+      setItems([]);
+      setErrMsg(null);
+      return;
+    }
+
     (async () => {
       const { data, error } = await supabase
         .schema("public")
@@ -97,6 +144,7 @@ export default function HomePage() {
       const mapped: CardItem[] = (data ?? []).map((row: any) => {
         let thumb = FALLBACK_THUMB;
         const path: string | null = row.photo_url ?? null;
+
         if (path) {
           if (/^https?:\/\//i.test(path)) {
             thumb = path;
@@ -107,6 +155,7 @@ export default function HomePage() {
             thumb = urlData?.publicUrl || FALLBACK_THUMB;
           }
         }
+
         return {
           id: String(row.id),
           title: String(row.title ?? "Untitled"),
@@ -120,10 +169,17 @@ export default function HomePage() {
       setItems(mapped);
       setErrMsg(null);
     })();
-  }, []);
+  }, [user, authLoading]);
 
-  // Fetch live stats
+  // ✅ Fetch live stats ONLY when logged in
   useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      setStats({ totalItems: 0, claimed: 0, recent: 0, claimRate: 0 });
+      return;
+    }
+
     (async () => {
       try {
         const { data: items, error } = await supabase
@@ -139,7 +195,7 @@ export default function HomePage() {
 
         const THIRTY_D_MS = 30 * 24 * 60 * 60 * 1000;
         const recent = items.filter(
-          (it) => new Date(it.created_at).getTime() >= Date.now() - THIRTY_D_MS
+          (it) => new Date(it.created_at).getTime() >= Date.now() - THIRTY_D_MS,
         ).length;
 
         const denom = listed + claimed;
@@ -155,7 +211,7 @@ export default function HomePage() {
         console.error("Stats fetch failed:", e);
       }
     })();
-  }, []);
+  }, [user, authLoading]);
 
   return (
     <CreekPageShell>
@@ -186,24 +242,35 @@ export default function HomePage() {
             <p className="mt-3 text-white/95">
               Fast, fair, and secure—get belongings back where they belong.
             </p>
+
             <div className="mt-6 flex flex-wrap items-center gap-3">
               {/* Primary */}
-              <Link
-                href="/report"
-                className="inline-flex h-[42px] items-center justify-center rounded-lg px-5 text-sm font-semibold text-white shadow-md transition no-underline"
+              <button
+                type="button"
+                onClick={() => {
+                  if (authLoading) return;
+                  if (user) router.push("/report");
+                  else openPanel("/report");
+                }}
+                className="inline-flex h-[42px] items-center justify-center rounded-lg px-5 text-sm font-semibold text-white shadow-md transition"
                 style={{ backgroundColor: CREEK_RED }}
               >
                 Report Found Item
-              </Link>
+              </button>
 
-              {/* Secondary (ghost) */}
-              <Link
-                href="/search"
+              {/* Secondary */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (authLoading) return;
+                  if (user) router.push("/search");
+                  else openPanel("/search");
+                }}
                 className="inline-flex h-[42px] items-center justify-center rounded-lg border border-white/80 px-5 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2"
                 style={{ ["--tw-ring-color" as any]: CREEK_NAVY }}
               >
                 Browse Items
-              </Link>
+              </button>
             </div>
           </motion.div>
         </div>
@@ -233,13 +300,42 @@ export default function HomePage() {
 
       {/* Sections */}
       <MissionSection />
-      <StatsSection stats={stats} />
+
+      {/* ✅ Program stats ONLY when logged in */}
+      {authLoading ? null : user ? (
+        <StatsSection stats={stats} />
+      ) : (
+        <StatsLocked onSignIn={() => openPanel()} />
+      )}
+
       <TestimonialsSection />
       <StoriesSection />
 
-      {/* 📋 RECENTLY REPORTED */}
+      {/* 📋 RECENTLY REPORTED (AUTH ONLY) */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-        {items.length > 0 ? (
+        {authLoading ? (
+          <section className="rounded-2xl border border-dashed border-gray-300 py-12 text-center">
+            <p className="text-sm text-gray-600">Loading…</p>
+          </section>
+        ) : !user ? (
+          <section className="rounded-2xl border border-dashed border-gray-300 py-16">
+            <div className="text-center">
+              <p className="text-lg font-medium">Staff login required</p>
+              <p className="mt-1 text-sm text-gray-600">
+                Please sign in to view recently reported items.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => openPanel()}
+                className="mt-4 inline-block rounded-lg px-4 py-2 text-white"
+                style={{ backgroundColor: CREEK_RED }}
+              >
+                Sign in
+              </button>
+            </div>
+          </section>
+        ) : items.length > 0 ? (
           <>
             <div className="mb-4 flex items-center justify-between">
               <h2
@@ -248,14 +344,21 @@ export default function HomePage() {
               >
                 Recently Reported
               </h2>
-              <Link
-                href="/search"
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (authLoading) return;
+                  if (user) router.push("/search");
+                  else openPanel("/search");
+                }}
                 className="text-sm underline"
                 style={{ color: CREEK_RED }}
               >
                 View all
-              </Link>
+              </button>
             </div>
+
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {items.map((it) => (
                 <li key={it.id}>
@@ -272,13 +375,19 @@ export default function HomePage() {
                 Be the first to add a found item so we can get it back to its
                 owner.
               </p>
-              <Link
-                href="/report"
-                className="mt-4 rounded-lg px-4 py-2 text-white"
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (authLoading) return;
+                  if (user) router.push("/report");
+                  else openPanel("/report");
+                }}
+                className="mt-4 inline-block rounded-lg px-4 py-2 text-white"
                 style={{ backgroundColor: CREEK_RED }}
               >
                 Report an Item
-              </Link>
+              </button>
             </div>
           </section>
         )}
@@ -367,7 +476,7 @@ function CreekRibbon() {
 /* ---------- Paper Grid ---------- */
 function PaperGrid({ children }: { children: React.ReactNode }) {
   const dot = encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
+    `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`,
   );
   return (
     <div
@@ -464,9 +573,7 @@ function MissionSection() {
 function StatsSection({ stats }: { stats: LiveStats }) {
   const { totalItems, claimed, recent, claimRate } = stats;
 
-  // Bars: keep them visually nice even when totals are small
   const safePct = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
-  const barTotal = safePct(Math.min(totalItems / 2, 100));
   const barClaimed = totalItems ? safePct((claimed / totalItems) * 100) : 0;
   const barRecent = totalItems ? safePct((recent / totalItems) * 100) : 0;
 
@@ -505,6 +612,30 @@ function StatsSection({ stats }: { stats: LiveStats }) {
           bar={safePct(claimRate)}
         />
       </motion.div>
+    </section>
+  );
+}
+
+function StatsLocked({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      <SectionHeader title="Program stats" kicker="At a glance" />
+      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
+        <p className="text-lg font-medium" style={{ color: CREEK_NAVY }}>
+          Staff login required
+        </p>
+        <p className="mt-1 text-sm text-gray-600">
+          Sign in to view live program statistics.
+        </p>
+        <button
+          type="button"
+          onClick={onSignIn}
+          className="mt-4 inline-flex rounded-lg px-4 py-2 text-white"
+          style={{ backgroundColor: CREEK_RED }}
+        >
+          Sign in
+        </button>
+      </div>
     </section>
   );
 }
@@ -655,7 +786,6 @@ function CaseFile({
       className="group relative overflow-hidden rounded-xl border bg-white p-5 shadow-sm will-change-transform hover:shadow-lg"
       style={{ borderColor: "#E5E7EB" }}
     >
-      {/* animated red spine */}
       <motion.span
         className="absolute left-0 top-0 h-full w-1 rounded-l-xl"
         style={{ backgroundColor: CREEK_RED }}
