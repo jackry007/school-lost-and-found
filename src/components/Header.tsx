@@ -34,6 +34,9 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [showNotice, setShowNotice] = useState<null | boolean>(null);
 
+  // ✅ Pin logic: header behaves normally under logo, then becomes fixed once logo scrolls away
+  const [pinned, setPinned] = useState(false);
+
   // ===== Auth state =====
   const [auth, setAuth] = useState<AuthState>("loading");
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export function Header() {
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginErr, setLoginErr] = useState<string | null>(null);
 
-  // Scroll shadow
+  // Scroll shadow + compact height
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 6);
     onScroll();
@@ -62,6 +65,23 @@ export function Header() {
   // Notice display
   useEffect(() => {
     setShowNotice(shouldShowNoticeNow());
+  }, []);
+
+  // ✅ Observe school logo visibility (from layout.tsx: <div id="school-logo">...)
+  useEffect(() => {
+    const el = document.getElementById("school-logo");
+    if (!el) return;
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        // When logo is not visible, pin header
+        setPinned(!entry.isIntersecting);
+      },
+      { root: null, threshold: 0.01 },
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
   }, []);
 
   // Auth load + listener
@@ -195,26 +215,30 @@ export function Header() {
     () => [
       { href: "/", label: "Lost & Found", guard: false },
       { href: "/report", label: "Report Found Item", guard: true },
-      { href: "/admin", label: "Admin", guard: true },
+      { href: "/admin", label: "Admin", guard: false },
     ],
     [],
   );
 
+  // Reserve space when pinned so content doesn't jump
+  const headerH = scrolled ? 56 : 64; // h-14 / h-16
+
   return (
     <>
-      {/* ✅ ONLY THIS RED BAR IS STICKY */}
+      {pinned && <div aria-hidden="true" style={{ height: headerH }} />}
+
+      {/* ✅ Becomes fixed only after logo scrolls away (prevents sticky glitches on Home) */}
       <header
         className={[
-          "sticky top-0 z-50 text-white transition-all duration-300", // z-50 helps it stay above hero overlays
+          pinned ? "fixed" : "relative",
+          "top-0 left-0 right-0 z-[9999] w-full text-white transition-all duration-300",
           scrolled
             ? "shadow-[0_6px_18px_rgba(0,0,0,.18)]"
             : "shadow-[0_10px_28px_rgba(0,0,0,.12)]",
         ].join(" ")}
         style={{
           background:
-            "linear-gradient(180deg, rgba(191,30,46,0.96) 0%, rgba(168,21,36,0.96) 100%)",
-          backdropFilter: "saturate(120%) blur(6px)",
-          WebkitBackdropFilter: "saturate(120%) blur(6px)",
+            "linear-gradient(180deg, rgba(191,30,46,0.985) 0%, rgba(168,21,36,0.985) 100%)",
           borderBottom: "1px solid rgba(0,0,0,.18)",
         }}
       >
@@ -432,7 +456,7 @@ export function Header() {
         />
       </header>
 
-      {/* These scroll normally (NOT sticky) */}
+      {/* These scroll normally (NOT pinned) */}
       <div
         className="h-8 w-full shadow-[inset_0_-1px_0_rgba(0,0,0,.08)]"
         style={{

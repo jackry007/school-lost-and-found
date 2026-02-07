@@ -452,7 +452,7 @@ function CreekPageShell({ children }: { children: React.ReactNode }) {
         backgroundImage:
           "radial-gradient(rgba(11,44,92,0.06) 1px, transparent 1px)",
         backgroundSize: "18px 18px",
-        backgroundAttachment: "fixed",
+        backgroundAttachment: "scroll",
       }}
     >
       {children}

@@ -9,7 +9,6 @@ import type { Metadata } from "next";
 import { Header } from "@/components/Header";
 import SchoolHeaderLogo from "@/components/SchoolHeaderLogo";
 import Footer from "@/components/Footer";
-
 import { AuthUIProvider } from "@/components/AuthUIProvider";
 
 export const metadata: Metadata = {
@@ -28,9 +27,11 @@ export default function RootLayout({
         suppressHydrationWarning
         className="min-h-dvh bg-[var(--background)] text-[var(--foreground)] antialiased"
       >
-        {/* ✅ Provider wraps the WHOLE app so any page can open the Header sign-in panel */}
         <AuthUIProvider>
-          <SchoolHeaderLogo />
+          <div id="school-logo">
+            <SchoolHeaderLogo />
+          </div>
+
           <Header />
 
           <main id="main" className="py-8">
