@@ -1,7 +1,7 @@
 // src/app/page.tsx
 // ------------------------------------------------------
 // Cherry Creek HS Lost & Found — CCHS-branded
-// Hero + Mission + (Stats gated) + Testimonials + Stories
+// Hero + Mission + (Stats PUBLIC) + Testimonials + Stories
 // With PageShell background, Creek ribbon, denser grids.
 // ------------------------------------------------------
 
@@ -32,6 +32,13 @@ type LiveStats = {
   claimed: number;
   recent: number;
   claimRate: number; // 0-100
+};
+
+type PublicStatsRow = {
+  total_items: number | null;
+  claimed: number | null;
+  recent: number | null;
+  claim_rate: number | null;
 };
 
 const BUCKET = "item-photos";
@@ -69,7 +76,7 @@ export default function HomePage() {
   const [items, setItems] = useState<CardItem[]>([]);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  // ✅ Auth gating
+  // ✅ Auth gating (still used for cards + protected actions)
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -108,13 +115,47 @@ export default function HomePage() {
     };
   }, []);
 
-  // 🧮 Live stats
+  // 🧮 Program stats (PUBLIC)
   const [stats, setStats] = useState<LiveStats>({
     totalItems: 0,
     claimed: 0,
     recent: 0,
     claimRate: 0,
   });
+
+  // ✅ Fetch PUBLIC stats for everyone (no login required)
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("public_program_stats")
+          .select("*")
+          .single();
+
+        if (error) throw error;
+
+        const row = (data as PublicStatsRow) ?? null;
+        if (!alive) return;
+
+        setStats({
+          totalItems: row?.total_items ?? 0,
+          claimed: row?.claimed ?? 0,
+          recent: row?.recent ?? 0,
+          claimRate: row?.claim_rate ?? 0,
+        });
+      } catch (e: any) {
+        console.error("Public stats fetch failed:", e?.message ?? e);
+        if (!alive) return;
+        setStats({ totalItems: 0, claimed: 0, recent: 0, claimRate: 0 });
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // ✅ Fetch cards ONLY when logged in
   useEffect(() => {
@@ -168,48 +209,6 @@ export default function HomePage() {
 
       setItems(mapped);
       setErrMsg(null);
-    })();
-  }, [user, authLoading]);
-
-  // ✅ Fetch live stats ONLY when logged in
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (!user) {
-      setStats({ totalItems: 0, claimed: 0, recent: 0, claimRate: 0 });
-      return;
-    }
-
-    (async () => {
-      try {
-        const { data: items, error } = await supabase
-          .from("items")
-          .select("id, created_at, status");
-
-        if (error) throw error;
-        if (!items) return;
-
-        const total = items.length;
-        const claimed = items.filter((it) => it.status === "claimed").length;
-        const listed = items.filter((it) => it.status === "listed").length;
-
-        const THIRTY_D_MS = 30 * 24 * 60 * 60 * 1000;
-        const recent = items.filter(
-          (it) => new Date(it.created_at).getTime() >= Date.now() - THIRTY_D_MS,
-        ).length;
-
-        const denom = listed + claimed;
-        const claimRate = denom ? Math.round((claimed / denom) * 100) : 0;
-
-        setStats({
-          totalItems: total,
-          claimed,
-          recent,
-          claimRate,
-        });
-      } catch (e) {
-        console.error("Stats fetch failed:", e);
-      }
     })();
   }, [user, authLoading]);
 
@@ -301,12 +300,8 @@ export default function HomePage() {
       {/* Sections */}
       <MissionSection />
 
-      {/* ✅ Program stats ONLY when logged in */}
-      {authLoading ? null : user ? (
-        <StatsSection stats={stats} />
-      ) : (
-        <StatsLocked onSignIn={() => openPanel()} />
-      )}
+      {/* ✅ Program stats are PUBLIC now */}
+      <StatsSection stats={stats} />
 
       <TestimonialsSection />
       <StoriesSection />
@@ -612,30 +607,6 @@ function StatsSection({ stats }: { stats: LiveStats }) {
           bar={safePct(claimRate)}
         />
       </motion.div>
-    </section>
-  );
-}
-
-function StatsLocked({ onSignIn }: { onSignIn: () => void }) {
-  return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      <SectionHeader title="Program stats" kicker="At a glance" />
-      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center">
-        <p className="text-lg font-medium" style={{ color: CREEK_NAVY }}>
-          Staff login required
-        </p>
-        <p className="mt-1 text-sm text-gray-600">
-          Sign in to view live program statistics.
-        </p>
-        <button
-          type="button"
-          onClick={onSignIn}
-          className="mt-4 inline-flex rounded-lg px-4 py-2 text-white"
-          style={{ backgroundColor: CREEK_RED }}
-        >
-          Sign in
-        </button>
-      </div>
     </section>
   );
 }
