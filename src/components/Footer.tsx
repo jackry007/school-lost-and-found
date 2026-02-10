@@ -3,199 +3,247 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
-
-const CREEK_RED = "#BF1E2E";
-const CREEK_NAVY = "#0B2C5C";
-const NAVY_DARKMODE = "#1E407A"; // slightly brighter for dark contrast
+import { ArrowUpRight, Clock, Mail, MapPin, ChevronUp } from "lucide-react";
 
 import logo from "../../public/images/cherry-creek-logo.png";
 
+const CREEK_RED = "#BF1E2E";
+const CREEK_NAVY = "#0B2C5C";
+
 export default function Footer() {
   const year = useMemo(() => new Date().getFullYear(), []);
-  const ringColor = `color-mix(in oklab, ${CREEK_NAVY} 88%, white)`;
+
+  const helpLinks = [
+    ["FAQ", "/faq"],
+    ["Help Center", "/help"],
+    ["Accessibility", "/accessibility"],
+    ["Contact", "/contact"],
+  ] as const;
+
+  const policyLinks = [
+    ["Privacy", "/privacy"],
+    ["Terms of Use", "/terms"],
+    ["Safety & Reporting", "/safety"],
+  ] as const;
 
   return (
     <footer
-      className="mt-16 border-t border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-200"
+      className="mt-16 border-t border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-neutral-950 dark:text-neutral-200"
       aria-label="Site footer"
+      id="site-footer"
     >
-      {/* Gradient accent */}
+      {/* Accent bar */}
       <div
         className="h-1 w-full"
-        style={{ background: "linear-gradient(90deg,#BF1E2E 0%,#0B2C5C 100%)" }}
+        style={{
+          background: `linear-gradient(90deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+        }}
         aria-hidden="true"
       />
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        {/* Top grid */}
-        <div className="grid gap-12 md:grid-cols-[1.2fr_1fr_1fr] md:items-start">
-          {/* Brand + contact */}
-          <section aria-labelledby="footer-branding">
-            <h2 id="footer-branding" className="sr-only">
-              About this site
-            </h2>
-            <div className="flex items-start gap-4">
-              <Link
-                href="/"
-                className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
-                style={{ ["--tw-ring-color" as any]: ringColor }}
-              >
-                <Image
-                  src={logo}
-                  alt="Cherry Creek High School logo"
-                  width={88}
-                  height={88}
-                  className="h-22 w-22 rounded-md"
-                  priority
-                />
-              </Link>
+        {/* Modern “app card” container */}
+        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-6">
+          {/* Top area */}
+          <div className="grid gap-6 md:grid-cols-[1.35fr_1fr] md:items-start">
+            {/* Brand block */}
+            <section aria-labelledby="footer-branding">
+              <h2 id="footer-branding" className="sr-only">
+                About this site
+              </h2>
 
-              <div className="max-w-prose">
-                <p className="text-lg font-extrabold text-gray-900 dark:text-white">
-                  Cherry Creek HS — Lost &amp; Found
-                </p>
-                <p className="mt-1 text-sm text-gray-600 dark:text-neutral-400">
-                  Find or return lost items quickly and securely.
-                </p>
+              <div className="flex items-start gap-4">
+                <Link
+                  href="/"
+                  className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+                  style={{ ["--tw-ring-color" as any]: "rgba(11,44,92,.45)" }}
+                  aria-label="Go to homepage"
+                >
+                  <Image
+                    src={logo}
+                    alt="Cherry Creek High School logo"
+                    width={96}
+                    height={96}
+                    className="h-16 w-16 rounded-2xl border border-black/10 bg-white object-contain dark:border-white/10 sm:h-20 sm:w-20"
+                    priority
+                  />
+                </Link>
 
-                {/* Definition list = better semantics */}
-                <dl className="mt-3 text-sm">
-                  <div className="mt-1">
-                    <dt className="inline font-medium">Pickup:</dt>{" "}
-                    <dd className="inline">
-                      Main Office · Mon–Fri, 7:30a–3:30p
-                    </dd>
+                <div className="min-w-0">
+                  <p className="text-base font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-lg">
+                    Cherry Creek HS — Lost &amp; Found
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-neutral-300">
+                    Find or return lost items quickly and securely.
+                  </p>
+
+                  {/* Info chips */}
+                  <div className="mt-4 grid gap-2">
+                    <div className="flex items-start gap-2 rounded-2xl border border-black/10 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200">
+                      <Clock
+                        size={16}
+                        className="mt-0.5 opacity-80"
+                        aria-hidden="true"
+                      />
+                      <span className="leading-snug">
+                        <span className="font-semibold">Pickup:</span> Main
+                        Office · Mon–Fri, 7:30a–3:30p
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-2 rounded-2xl border border-black/10 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200">
+                      <MapPin
+                        size={16}
+                        className="mt-0.5 opacity-80"
+                        aria-hidden="true"
+                      />
+                      <span className="leading-snug">
+                        <span className="font-semibold">Location:</span> Cherry
+                        Creek High School
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-2 rounded-2xl border border-black/10 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200">
+                      <Mail
+                        size={16}
+                        className="mt-0.5 opacity-80"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 leading-snug">
+                        <span className="font-semibold">Contact:</span>{" "}
+                        <Link
+                          href="mailto:lostfound@cherrycreekschools.org"
+                          className="underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950 rounded"
+                        >
+                          lostfound@cherrycreekschools.org
+                        </Link>
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-1">
-                    <dt className="inline font-medium">Contact:</dt>{" "}
-                    <dd className="inline">
-                      <Link
-                        href="mailto:lostfound@cherrycreekschools.org"
-                        className="underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-md"
-                        style={{ ["--tw-ring-color" as any]: ringColor }}
-                      >
-                        lostfound@cherrycreekschools.org
-                      </Link>
-                    </dd>
-                  </div>
-                </dl>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          {/* Help */}
-          <nav aria-labelledby="footer-help" className="text-sm">
-            <h2
-              id="footer-help"
-              className="font-semibold text-gray-900 dark:text-white"
-            >
-              Help
-            </h2>
-            <ul className="mt-3 space-y-2">
-              {[
-                ["FAQ", "/faq"],
-                ["Help Center", "/help"],
-                ["Accessibility", "/accessibility"],
-                ["Contact", "/contact"],
-              ].map(([label, href]) => (
-                <li key={href}>
+            {/* Link panels */}
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-1">
+              {/* Help card */}
+              <nav
+                aria-labelledby="footer-help"
+                className="rounded-2xl border border-black/10 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5"
+              >
+                <h2
+                  id="footer-help"
+                  className="text-sm font-semibold text-gray-900 dark:text-white"
+                >
+                  Help
+                </h2>
+                <ul className="mt-3 space-y-1">
+                  {helpLinks.map(([label, href]) => (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        className="group flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-gray-800 hover:bg-white hover:text-gray-950 dark:text-neutral-200 dark:hover:bg-white/10 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+                      >
+                        <span>{label}</span>
+                        <ArrowUpRight
+                          size={14}
+                          className="opacity-50 group-hover:opacity-80 transition-opacity"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+
+              {/* Policies card */}
+              <nav
+                aria-labelledby="footer-policies"
+                className="rounded-2xl border border-black/10 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5"
+              >
+                <h2
+                  id="footer-policies"
+                  className="text-sm font-semibold text-gray-900 dark:text-white"
+                >
+                  Policies
+                </h2>
+                <ul className="mt-3 space-y-1">
+                  {policyLinks.map(([label, href]) => (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        className="group flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-gray-800 hover:bg-white hover:text-gray-950 dark:text-neutral-200 dark:hover:bg-white/10 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+                      >
+                        <span>{label}</span>
+                        <ArrowUpRight
+                          size={14}
+                          className="opacity-50 group-hover:opacity-80 transition-opacity"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div
+            className="my-6 h-px w-full bg-gray-200 dark:bg-white/10"
+            aria-hidden="true"
+          />
+
+          {/* Bottom actions */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <nav aria-label="Footer quick actions" className="text-sm">
+              <ul className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                <li>
                   <Link
-                    href={href}
-                    className="rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 underline-offset-2 hover:underline"
+                    href="/report"
+                    className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
                     style={{
-                      ["--tw-ring-color" as any]: ringColor,
-                      color: "oklch(35% 0.06 255)",
+                      backgroundColor: CREEK_RED,
+                      ["--tw-ring-color" as any]: "rgba(191,30,46,.55)",
                     }}
                   >
-                    {label}
+                    Report Found Item
                   </Link>
                 </li>
-              ))}
-            </ul>
-          </nav>
 
-          {/* Policies */}
-          <nav aria-labelledby="footer-policies" className="text-sm">
-            <h2
-              id="footer-policies"
-              className="font-semibold text-gray-900 dark:text-white"
-            >
-              Policies
-            </h2>
-            <ul className="mt-3 space-y-2">
-              {[
-                ["Privacy", "/privacy"],
-                ["Terms of Use", "/terms"],
-                ["Safety & Reporting", "/safety"],
-              ].map(([label, href]) => (
-                <li key={href}>
+                <li>
                   <Link
-                    href={href}
-                    className="rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 underline-offset-2 hover:underline"
-                    style={{ ["--tw-ring-color" as any]: ringColor }}
+                    href="/search"
+                    className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold border border-black/10 bg-white hover:bg-gray-50 text-gray-900 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
                   >
-                    {label}
+                    Browse Items
                   </Link>
                 </li>
-              ))}
-            </ul>
-          </nav>
+
+                <li>
+                  <a
+                    href="#top"
+                    className="inline-flex items-center gap-2 justify-center rounded-full px-4 py-2 text-sm font-semibold underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+                  >
+                    Back to top <ChevronUp size={16} aria-hidden="true" />
+                  </a>
+                </li>
+              </ul>
+            </nav>
+
+            <p className="w-full text-center text-xs text-gray-500 dark:text-neutral-400 md:w-auto md:text-right">
+              © {year} Cherry Creek High School. All rights reserved.
+            </p>
+          </div>
         </div>
 
-        {/* Divider */}
-        <div
-          className="my-8 h-px w-full bg-gray-200 dark:bg-neutral-800"
-          aria-hidden="true"
-        />
-
-        {/* Utility row */}
-        <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
-          <nav aria-label="Footer quick actions" className="text-sm">
-            <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <li>
-                <Link
-                  href="/report"
-                  className="rounded-md px-3 py-1.5 font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={{
-                    backgroundColor: CREEK_RED,
-                    ["--tw-ring-color" as any]: ringColor,
-                  }}
-                >
-                  Report Found Item
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/search"
-                  className="rounded-md underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={{ ["--tw-ring-color" as any]: ringColor }}
-                >
-                  Browse Items
-                </Link>
-              </li>
-              <li
-                aria-hidden
-                className="h-5 w-px bg-gray-300 dark:bg-neutral-700"
-              />
-              <li>
-                <a
-                  href="#top"
-                  className="rounded-md underline underline-offset-2 hover:no-underline focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={{ ["--tw-ring-color" as any]: ringColor }}
-                >
-                  Back to top
-                </a>
-              </li>
-            </ul>
-          </nav>
-
-          <p className="text-xs text-gray-500 dark:text-neutral-500">
-            © {year} Cherry Creek High School. All rights reserved.
-          </p>
+        {/* Tiny “subtle” hint bar below card */}
+        <div className="mt-4 text-center text-xs text-gray-400 dark:text-neutral-500">
+          Lost something? Check the main office first — items move fast.
         </div>
       </div>
 
-      {/* JSON-LD: Organization (optional tiny SEO boost) */}
+      {/* JSON-LD (optional) */}
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -205,23 +253,10 @@ export default function Footer() {
             "@type": "Organization",
             name: "Cherry Creek High School Lost & Found",
             email: "lostfound@cherrycreekschools.org",
-            url: "https://your-domain.example", // update
             logo: "/images/cherry-creek-logo.png",
           }),
         }}
       />
-      <style jsx global>{`
-        /* Slightly brighter link color in dark mode for contrast */
-        @media (prefers-color-scheme: dark) {
-          footer a {
-            color: ${NAVY_DARKMODE};
-          }
-          footer a:hover {
-            color: ${NAVY_DARKMODE};
-            text-decoration: underline;
-          }
-        }
-      `}</style>
     </footer>
   );
 }

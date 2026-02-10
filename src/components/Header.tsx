@@ -4,7 +4,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Menu } from "lucide-react";
+
 import { supabase } from "@/lib/supabaseClient";
 import MessagesPortal from "@/components/MessagesPortal";
 import { useAuthUI } from "@/components/AuthUIProvider";
@@ -34,15 +35,19 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [showNotice, setShowNotice] = useState<null | boolean>(null);
 
-  // ✅ Pin logic: header behaves normally under logo, then becomes fixed once logo scrolls away
+  // ✅ Pin logic
   const [pinned, setPinned] = useState(false);
+
+  // ✅ Mobile menu
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileRef = useRef<HTMLDivElement>(null);
 
   // ===== Auth state =====
   const [auth, setAuth] = useState<AuthState>("loading");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [role, setRole] = useState<ProfileRole | null>(null);
 
-  // ✅ Shared panel state via provider (so other pages can open it)
+  // ✅ Shared panel state via provider
   const { panelOpen, openPanel, closePanel, redirectTo, clearRedirect } =
     useAuthUI();
 
@@ -67,14 +72,13 @@ export function Header() {
     setShowNotice(shouldShowNoticeNow());
   }, []);
 
-  // ✅ Observe school logo visibility (from layout.tsx: <div id="school-logo">...)
+  // ✅ Observe school logo visibility
   useEffect(() => {
     const el = document.getElementById("school-logo");
     if (!el) return;
 
     const obs = new IntersectionObserver(
       ([entry]) => {
-        // When logo is not visible, pin header
         setPinned(!entry.isIntersecting);
       },
       { root: null, threshold: 0.01 },
@@ -83,6 +87,24 @@ export function Header() {
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Click outside mobile menu
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    function onClick(e: MouseEvent) {
+      if (!mobileRef.current) return;
+      if (!mobileRef.current.contains(e.target as Node)) setMobileOpen(false);
+    }
+
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [mobileOpen]);
 
   // Auth load + listener
   useEffect(() => {
@@ -176,7 +198,7 @@ export function Header() {
       return;
     }
 
-    // ✅ Fetch role immediately after login (no refresh needed)
+    // ✅ Fetch role immediately after login
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
 
@@ -210,7 +232,7 @@ export function Header() {
     router.push("/");
   }
 
-  // Nav items (you can also hide Admin unless role allows)
+  // Nav items
   const nav = useMemo(
     () => [
       { href: "/", label: "Lost & Found", guard: false },
@@ -227,7 +249,6 @@ export function Header() {
     <>
       {pinned && <div aria-hidden="true" style={{ height: headerH }} />}
 
-      {/* ✅ Becomes fixed only after logo scrolls away (prevents sticky glitches on Home) */}
       <header
         className={[
           pinned ? "fixed" : "relative",
@@ -249,23 +270,24 @@ export function Header() {
           ].join(" ")}
         >
           {/* Left: Logo + Nav */}
-          <div className="flex items-center gap-7">
+          <div className="flex items-center gap-4 sm:gap-7">
             <Link
               href="/"
               className="group flex items-center gap-3 rounded-lg px-2 py-1 transition no-underline decoration-0"
               aria-label="Cherry Creek Lost & Found Home"
             >
               <span className="text-2xl leading-none">🎒</span>
-              <div className="leading-tight">
-                <div className="text-[16px] font-extrabold tracking-tight">
+              <div className="leading-tight max-w-[150px] sm:max-w-none">
+                <div className="text-[16px] font-extrabold tracking-tight truncate">
                   Cherry Creek
                 </div>
-                <div className="text-[12px] font-medium text-white/90">
+                <div className="text-[12px] font-medium text-white/90 truncate">
                   Lost &amp; Found
                 </div>
               </div>
             </Link>
 
+            {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-1.5">
               {nav.map((n) => {
                 const active = pathname === n.href;
@@ -334,14 +356,32 @@ export function Header() {
             </nav>
           </div>
 
-          {/* Right: Search + Auth / Messaging */}
-          <div className="relative flex items-center gap-3">
+          {/* Right: Mobile menu + Search + Auth */}
+          <div className="relative flex items-center gap-3" ref={mobileRef}>
+            {/* ✅ Mobile hamburger */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              className={[
+                "md:hidden inline-flex items-center justify-center",
+                "rounded-full px-3 py-2",
+                "border border-white/30 bg-white/10 hover:bg-white/18",
+                "focus:outline-none focus:ring-2 focus:ring-white/60 transition",
+              ].join(" ")}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              title={mobileOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+
             {/* Search chip (guarded) */}
             <button
               type="button"
               onClick={() => guardedGo("/search")}
               className={[
-                "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
+                "inline-flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-sm font-medium",
                 "border border-white/30 bg-white/10 hover:bg-white/18",
                 "focus:outline-none focus:ring-2 focus:ring-white/60 transition",
               ].join(" ")}
@@ -419,6 +459,7 @@ export function Header() {
                       className="absolute right-2 top-2 rounded p-1 text-gray-500 hover:bg-gray-100"
                       aria-label="Close"
                       onClick={closePanel}
+                      type="button"
                     >
                       <X size={16} />
                     </button>
@@ -432,7 +473,7 @@ export function Header() {
                 <MessagesPortal />
 
                 <span
-                  className="max-w-[170px] truncate rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm"
+                  className="hidden sm:inline max-w-[170px] truncate rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm"
                   title={userEmail ?? ""}
                 >
                   {userEmail}
@@ -442,11 +483,77 @@ export function Header() {
                   onClick={handleLogout}
                   className="rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm hover:bg-white/18 transition"
                   title="Sign out"
+                  type="button"
                 >
                   Log out
                 </button>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ✅ Mobile dropdown nav */}
+        <div
+          id="mobile-nav"
+          className={[
+            "md:hidden overflow-hidden transition-[max-height] duration-300 ease-out",
+            mobileOpen ? "max-h-72" : "max-h-0",
+          ].join(" ")}
+        >
+          <div className="mx-auto max-w-7xl px-4 pb-3">
+            <div className="rounded-2xl border border-white/20 bg-white/10 p-2">
+              <div className="grid gap-2">
+                {nav.map((n) => {
+                  const active = pathname === n.href;
+
+                  if (n.guard) {
+                    return (
+                      <button
+                        key={n.href}
+                        type="button"
+                        onClick={() => {
+                          setMobileOpen(false);
+                          guardedGo(n.href);
+                        }}
+                        className={[
+                          "w-full text-left rounded-xl px-4 py-3 text-sm font-semibold transition",
+                          active
+                            ? "bg-yellow-400 text-red-900"
+                            : "text-white hover:bg-white/15",
+                        ].join(" ")}
+                      >
+                        {n.label}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={[
+                        "no-underline decoration-0 block rounded-xl px-4 py-3 text-sm font-semibold transition",
+                        active
+                          ? "bg-yellow-400 text-red-900"
+                          : "text-white hover:bg-white/15",
+                      ].join(" ")}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      {n.label}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Optional: show signed-in email on mobile */}
+              {auth === "authed" && userEmail && (
+                <div className="mt-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs text-white/90 truncate">
+                  Signed in as:{" "}
+                  <span className="font-semibold">{userEmail}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
