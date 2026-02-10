@@ -83,6 +83,12 @@ export default function HomePage() {
   const router = useRouter();
   const { openPanel } = useAuthUI();
 
+  const goProtected = (href: string) => {
+    if (authLoading) return;
+    if (user) router.push(href);
+    else openPanel(href); // ✅ opens header sign-in and redirects after login
+  };
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
@@ -304,7 +310,7 @@ export default function HomePage() {
       <StatsSection stats={stats} />
 
       <TestimonialsSection />
-      <StoriesSection />
+      <StoriesSection goProtected={goProtected} />
 
       {/* 📋 RECENTLY REPORTED (AUTH ONLY) */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
@@ -717,7 +723,11 @@ function QuoteCard({
 }
 
 /* ----- Success Stories ----- */
-function StoriesSection() {
+function StoriesSection({
+  goProtected,
+}: {
+  goProtected: (href: string) => void;
+}) {
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10">
       <SectionHeader title="Success stories" kicker="Real wins" />
@@ -729,25 +739,26 @@ function StoriesSection() {
         className="mt-4 grid gap-5 md:grid-cols-3"
       >
         {STORIES.map((s) => (
-          <CaseFile key={s.title} {...s} />
+          <CaseFile key={s.title} {...s} goProtected={goProtected} />
         ))}
       </motion.div>
     </section>
   );
 }
-
 function CaseFile({
   icon,
   title,
   blurb,
   ctaLabel,
   ctaHref,
+  goProtected,
 }: {
   icon: string;
   title: string;
   blurb: string;
   ctaLabel?: string;
   ctaHref?: string;
+  goProtected: (href: string) => void;
 }) {
   return (
     <motion.article
@@ -771,9 +782,14 @@ function CaseFile({
         </h3>
       </div>
       <p className="mt-3 text-sm text-gray-700">{blurb}</p>
+
       {ctaHref && (
         <Link
           href={ctaHref}
+          onClick={(e) => {
+            e.preventDefault(); // ✅ stop instant navigation
+            goProtected(ctaHref); // ✅ login gate + redirect
+          }}
           className="mt-4 inline-block text-sm font-medium underline"
           style={{ color: CREEK_RED }}
         >
@@ -783,7 +799,6 @@ function CaseFile({
     </motion.article>
   );
 }
-
 /* ---------- Static content ---------- */
 const TESTIMONIALS = [
   {
