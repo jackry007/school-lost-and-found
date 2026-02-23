@@ -1,36 +1,174 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎒 CCHS Lost & Found Portal
 
-## Getting Started
+A secure, moderated Lost & Found platform built for school environments.  
+Designed to increase item return rates, reduce staff workload, and protect student privacy.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 📌 What It Is
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+CCHS Lost & Found is a full-stack web application that modernizes how schools manage misplaced items.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+It enables:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Structured item reporting
+- Advanced search & filtering
+- Secure claim verification
+- Admin moderation workflows
+- Privacy-first communication
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## ❗ Problem / Why
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Schools process hundreds of misplaced items every semester.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Traditional systems rely on:
 
-## Deploy on Vercel
+- Physical bins
+- Paper logs
+- Unsearchable spreadsheets
+- Manual coordination
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This leads to:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Low return rates
+- Poor visibility
+- Privacy risks
+- Staff inefficiency
+
+This platform replaces that process with a secure, searchable, and moderated system.
+
+---
+
+## ✨ Features
+
+### 👤 Public / Guests
+- Search and filter items
+- View detailed item pages
+- Submit claim requests
+- Report found items
+- Report lost items
+
+### 🎓 Authenticated Students & Staff
+- Track personal submissions
+- Receive status updates
+- Faster claim handling
+
+### 🛠 Admin Dashboard
+- Moderation queue (approve / deny / edit)
+- Status workflow:
+  `Pending → Listed → Claimed → Returned → Archived`
+- Redact sensitive information
+- Merge duplicate items
+- Analytics dashboard
+- CSV export
+- Role management
+- Audit logging
+
+---
+
+## 🖼 Screenshots
+
+> Replace these with real images in your repo.
+
+### Homepage
+![Homepage](docs/screenshots/home.png)
+
+### Search Page
+![Search Page](docs/screenshots/search.png)
+
+### Admin Dashboard
+![Admin Dashboard](docs/screenshots/admin.png)
+
+---
+
+## 🧱 Tech Stack
+
+**Frontend**
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- Accessible HTML5 components
+
+**Backend**
+- Next.js API Routes
+- PostgreSQL
+- Role-Based Access Control (RBAC)
+
+**Storage**
+- Object storage for images
+- Thumbnail generation
+- EXIF stripping
+
+**Authentication**
+- Email OTP (upgradeable to School SSO)
+
+---
+
+## 🏗 Architecture Overview
+
+The system follows a modern full-stack architecture using the Next.js App Router with server-side API routes.
+
+### High-Level Flow
+
+Client (Browser - Next.js Frontend)  
+↓  
+API Layer (Next.js Server Routes)  
+↓  
+Database (PostgreSQL via Supabase)  
+↓  
+Object Storage (Item Images)
+
+---
+
+### Core Components
+
+**Frontend**
+- App Router pages and layouts
+- Server + Client Components
+- Tailwind CSS UI
+- Accessible form handling
+- Role-based UI rendering
+
+**Backend**
+- REST-style API routes (`/api/...`)
+- Server-side validation
+- Authentication & authorization middleware
+- Moderation workflow engine
+- Claims processing logic
+
+**Database**
+- Users table (role-based access)
+- Items (found/lost)
+- Claims
+- Images
+- Audit logs
+- Notifications
+
+**Storage**
+- Secure object storage bucket
+- Randomized filenames
+- Thumbnail generation
+- EXIF metadata stripping
+
+---
+
+### Role-Based Access Control (RBAC)
+
+- Guest → Search, report, claim (rate-limited)
+- Authenticated User → Track submissions
+- Admin → Moderate, edit, approve, export, manage users
+
+All admin endpoints are protected via server-side role verification.
+
+---
+
+### Moderation Workflow
+
+1. Item submitted → `pending`
+2. Admin review → `approved` or `rejected`
+3. Approved item → `listed`
+4. Claim submitted → `under_review`
+5. Admin verifies → `claimed`
+6. Pickup confirmed → `returned`
