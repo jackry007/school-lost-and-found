@@ -319,21 +319,66 @@ export default function HomePage() {
             <p className="text-sm text-gray-600">Loading…</p>
           </section>
         ) : !user ? (
-          <section className="rounded-2xl border border-dashed border-gray-300 py-16">
-            <div className="text-center">
-              <p className="text-lg font-medium">User login required</p>
-              <p className="mt-1 text-sm text-gray-600">
-                Please sign in to view recently reported items.
+          <section className="relative overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-white py-16">
+            {/* subtle background pattern */}
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.35]"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 1px 1px, rgba(11,44,92,0.12) 1px, transparent 0)",
+                backgroundSize: "22px 22px",
+              }}
+            />
+
+            <div className="relative mx-auto flex max-w-xl flex-col items-center px-6 text-center">
+              {/* icon badge */}
+              <div
+                className="mb-4 grid h-14 w-14 place-items-center rounded-2xl border bg-white shadow-sm"
+                style={{ borderColor: "rgba(11,44,92,0.18)" }}
+                aria-hidden="true"
+              >
+                <span className="text-2xl">🎒</span>
+              </div>
+
+              {/* Option 2 copy */}
+              <p
+                className="text-2xl font-semibold"
+                style={{ color: CREEK_NAVY }}
+              >
+                Looking for something you lost?
+              </p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                Sign in to see recently reported items and check if your item
+                has been found.
               </p>
 
-              <button
-                type="button"
-                onClick={() => openPanel()}
-                className="mt-4 inline-block rounded-lg px-4 py-2 text-white"
-                style={{ backgroundColor: CREEK_RED }}
-              >
-                Sign in
-              </button>
+              {/* primary + secondary actions */}
+              <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => openPanel()}
+                  className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{
+                    backgroundColor: CREEK_RED,
+                    boxShadow: "0 8px 20px rgba(191,30,46,0.22)",
+                  }}
+                >
+                  Sign in
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => router.push("/report")}
+                  className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{
+                    color: CREEK_NAVY,
+                    border: "1px solid rgba(11,44,92,0.25)",
+                    background: "white",
+                  }}
+                >
+                  Report an item
+                </button>
+              </div>
             </div>
           </section>
         ) : items.length > 0 ? (
