@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import CreekDatePicker from "@/components/ui/CreekDatePicker";
 
 const BUCKET = "item-photos";
 
@@ -21,9 +22,11 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-/* ---- Brand tokens (match home) ---- */
-const CREEK_RED = "#BF1E2E";
-const CREEK_NAVY = "#0B2C5C";
+/* ---- CCHS Brand tokens ----
+   Royal Blue + Scarlet + White
+*/
+const CREEK_RED = "#BF1E2E"; // Scarlet
+const CREEK_NAVY = "#0B2C5C"; // Royal Blue (your chosen token)
 
 /* ---- Upload policy ---- */
 const MAX_MB = 5;
@@ -35,17 +38,18 @@ const ALLOWED_MIME = [
   "image/heif",
 ];
 
-/* ---- PaperGrid background (SSR-safe constants) ---- */
+/* ---- PaperGrid background ---- */
 const DOT_BG = encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
+  `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`,
 );
 const PAPER_STYLE: React.CSSProperties = {
   backgroundImage: `url("data:image/svg+xml,${DOT_BG}")`,
-  backgroundColor: "#fafbff",
+  backgroundColor: "#ffffff",
 };
 
 export default function ItemForm() {
   const router = useRouter();
+
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -57,6 +61,8 @@ export default function ItemForm() {
 
   // Local preview URL w/ cleanup
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>("No photo selected");
+
   useEffect(() => {
     return () => {
       if (filePreview) URL.revokeObjectURL(filePreview);
@@ -94,7 +100,7 @@ export default function ItemForm() {
       const fileMb = file.size / (1024 * 1024);
       if (fileMb > MAX_MB) {
         setErr(
-          `Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`
+          `Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`,
         );
         setSubmitting(false);
         return;
@@ -136,7 +142,7 @@ export default function ItemForm() {
       }
     }
 
-    // 2) Insert DB row
+    // 2) Insert DB row (UNCHANGED)
     try {
       const { error: insertErr } = await supabase.from("items").insert([
         {
@@ -162,65 +168,103 @@ export default function ItemForm() {
 
   return (
     <section className="mx-auto max-w-3xl">
-      {/* Header with shield */}
-      <div className="mb-5 flex items-center gap-2">
-        <svg width="28" height="32" viewBox="0 0 24 28" aria-hidden>
-          <path
-            d="M12 0l10 4v8c0 7-5 12-10 16C7 24 2 19 2 12V4l10-4z"
-            fill={CREEK_RED}
-          />
-          <path
-            d="M12 3l7 2v6c0 5-4 9-7 12-3-3-7-7-7-12V5l7-2z"
-            fill="white"
-            opacity=".95"
-          />
-          <path
-            d="M12 4.5l5 1.5v5c0 4-3.2 7-5 8.8-1.8-1.8-5-4.8-5-8.8v-5l5-1.5z"
-            fill={CREEK_NAVY}
-          />
-        </svg>
-        <h2
-          className="text-2xl sm:text-3xl font-extrabold tracking-tight"
-          style={{ color: CREEK_NAVY }}
-        >
-          Report a found item
-        </h2>
+      {/* Header */}
+      <div className="mb-5">
+        <div className="flex items-center gap-3">
+          {/* Shield */}
+          <div
+            className="grid h-10 w-10 place-items-center rounded-2xl border bg-white shadow-sm"
+            style={{ borderColor: "rgba(11,44,92,0.18)" }}
+            aria-hidden="true"
+          >
+            <svg width="26" height="30" viewBox="0 0 24 28">
+              <path
+                d="M12 0l10 4v8c0 7-5 12-10 16C7 24 2 19 2 12V4l10-4z"
+                fill={CREEK_RED}
+              />
+              <path
+                d="M12 3l7 2v6c0 5-4 9-7 12-3-3-7-7-7-12V5l7-2z"
+                fill="white"
+                opacity=".95"
+              />
+              <path
+                d="M12 4.5l5 1.5v5c0 4-3.2 7-5 8.8-1.8-1.8-5-4.8-5-8.8v-5l5-1.5z"
+                fill={CREEK_NAVY}
+              />
+            </svg>
+          </div>
+
+          <div>
+            <h2
+              className="text-2xl sm:text-3xl font-extrabold tracking-tight"
+              style={{ color: CREEK_NAVY }}
+            >
+              Report a found item
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Log an item found on campus so the owner can identify it and pick
+              it up at the Main Office.
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* Card */}
       <div
-        className="rounded-3xl p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,.05)] bg-white dark:bg-gray-900"
-        style={PAPER_STYLE}
+        className="relative overflow-hidden rounded-3xl border bg-white p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,.06)]"
+        style={{ borderColor: "rgba(11,44,92,0.15)", ...PAPER_STYLE }}
       >
+        {/* CCHS header stripe */}
+        <div
+          className="absolute left-0 top-0 h-2 w-full"
+          style={{ background: CREEK_NAVY }}
+        />
+        <div
+          className="absolute left-0 top-2 h-1 w-full"
+          style={{ background: CREEK_RED }}
+        />
+
+        <p className="mb-4 text-xs text-gray-500">
+          Fields marked{" "}
+          <span className="font-semibold" style={{ color: CREEK_RED }}>
+            *
+          </span>{" "}
+          are required.
+        </p>
+
         {err && (
-          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/20 dark:text-red-200">
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-50 p-3 text-sm text-red-700">
             {err}
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form onSubmit={onSubmit} className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Title */}
             <label className="block">
               <span
-                className="mb-1 block text-sm font-medium"
+                className="mb-1 block text-sm font-semibold"
                 style={{ color: CREEK_NAVY }}
               >
-                Title *
+                Title <span style={{ color: CREEK_RED }}>*</span>
               </span>
               <input
                 name="title"
                 required
                 placeholder="e.g., Black North Face Jacket"
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
-                           px-3 py-2 text-sm shadow-sm outline-none focus:ring-2
-                           focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                className="w-full rounded-xl border bg-white px-3 py-2 text-sm shadow-sm outline-none
+                           focus:ring-2 focus:ring-[rgba(11,44,92,0.55)]"
+                style={{ borderColor: "rgba(11,44,92,0.18)" }}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Brand + color + item type works best
+              </p>
             </label>
 
             {/* Category */}
             <label className="block">
               <span
-                className="mb-1 block text-sm font-medium"
+                className="mb-1 block text-sm font-semibold"
                 style={{ color: CREEK_NAVY }}
               >
                 Category
@@ -228,9 +272,9 @@ export default function ItemForm() {
               <select
                 name="category"
                 defaultValue="Misc"
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
-                           px-3 py-2 text-sm shadow-sm outline-none focus:ring-2
-                           focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                className="w-full rounded-xl border bg-white px-3 py-2 text-sm shadow-sm outline-none
+                           focus:ring-2 focus:ring-[rgba(11,44,92,0.55)]"
+                style={{ borderColor: "rgba(11,44,92,0.18)" }}
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -238,131 +282,187 @@ export default function ItemForm() {
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Choose the closest match
+              </p>
             </label>
 
             {/* Location */}
             <label className="block">
               <span
-                className="mb-1 block text-sm font-medium"
+                className="mb-1 block text-sm font-semibold"
                 style={{ color: CREEK_NAVY }}
               >
                 Location found
               </span>
               <input
                 name="location"
-                placeholder="e.g., Library 2F"
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
-                           px-3 py-2 text-sm shadow-sm outline-none focus:ring-2
-                           focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                placeholder="e.g., Library 2F near printers"
+                className="w-full rounded-xl border bg-white px-3 py-2 text-sm shadow-sm outline-none
+                           focus:ring-2 focus:ring-[rgba(11,44,92,0.55)]"
+                style={{ borderColor: "rgba(11,44,92,0.18)" }}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Be specific if you can — it helps staff confirm details.
+              </p>
             </label>
 
-            {/* Date (controlled after mount) */}
+            {/* Date (custom calendar) */}
             <label className="block">
               <span
-                className="mb-1 block text-sm font-medium"
+                className="mb-1 block text-sm font-semibold"
                 style={{ color: CREEK_NAVY }}
               >
-                Date found *
+                Date found <span style={{ color: CREEK_RED }}>*</span>
               </span>
-              <input
-                type="date"
-                name="date_found"
-                required
+
+              <CreekDatePicker
                 value={dateFound}
-                onChange={(e) => setDateFound(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
-                           px-3 py-2 text-sm shadow-sm outline-none focus:ring-2
-                           focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                onChange={setDateFound}
+                creekRed={CREEK_RED}
+                creekNavy={"#0B2C5C"}
+                required
               />
+
+              {/* keeps FormData + Supabase insert working */}
+              <input type="hidden" name="date_found" value={dateFound} />
+
+              <p className="mt-1 text-xs text-gray-500">
+                Pick the day the item was turned in to the office.
+              </p>
             </label>
           </div>
 
           {/* Notes */}
           <label className="block">
             <span
-              className="mb-1 block text-sm font-medium"
+              className="mb-1 block text-sm font-semibold"
               style={{ color: CREEK_NAVY }}
             >
               Notes (optional)
             </span>
             <textarea
               name="notes"
-              rows={3}
-              placeholder="Any identifying details, where exactly you left it, etc."
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
-                         px-3 py-2 text-sm shadow-sm outline-none focus:ring-2
-                         focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+              rows={4}
+              placeholder="Identifying details (stickers, initials, case color), or exactly where it was found."
+              className="w-full rounded-xl border bg-white px-3 py-2 text-sm shadow-sm outline-none
+                         focus:ring-2 focus:ring-[rgba(11,44,92,0.55)]"
+              style={{ borderColor: "rgba(11,44,92,0.18)" }}
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Avoid personal info like phone numbers — staff can verify identity
+              at pickup.
+            </p>
           </label>
 
           {/* Photo + preview */}
-          <div className="grid gap-4 md:grid-cols-[1fr,200px] md:items-start">
-            <label className="block">
+          <div className="grid gap-4 md:grid-cols-[1fr,220px] md:items-start">
+            <div className="block">
               <span
-                className="mb-1 block text-sm font-medium"
+                className="mb-1 block text-sm font-semibold"
                 style={{ color: CREEK_NAVY }}
               >
                 Photo (optional)
               </span>
-              <input
-                type="file"
-                name="photo"
-                accept="image/*"
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900
-                           px-3 py-2 text-sm shadow-sm outline-none file:mr-3 file:rounded-md file:border-0
-                           file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium
-                           hover:file:bg-gray-200 dark:file:bg-gray-800 dark:hover:file:bg-gray-700
-                           focus:ring-2 focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
-                onChange={(e) => {
-                  const f = e.currentTarget.files?.[0];
-                  if (filePreview) URL.revokeObjectURL(filePreview);
-                  if (f) {
-                    const url = URL.createObjectURL(f);
-                    setFilePreview(url);
-                  } else {
-                    setFilePreview(null);
-                  }
-                }}
-              />
-              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                JPG/PNG/WebP/HEIC, up to {MAX_MB}MB.
-              </p>
-            </label>
 
-            {filePreview && (
-              <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+              <div
+                className="rounded-2xl border border-dashed bg-white p-4"
+                style={{ borderColor: "rgba(11,44,92,0.22)" }}
+              >
+                <input
+                  type="file"
+                  name="photo"
+                  accept="image/*"
+                  className="w-full text-sm outline-none
+                             file:mr-3 file:rounded-md file:border-0
+                             file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold
+                             hover:file:bg-gray-200"
+                  onChange={(e) => {
+                    const f = e.currentTarget.files?.[0];
+                    if (filePreview) URL.revokeObjectURL(filePreview);
+
+                    if (f) {
+                      setFileName(f.name);
+                      setFilePreview(URL.createObjectURL(f));
+                    } else {
+                      setFileName("No photo selected");
+                      setFilePreview(null);
+                    }
+                  }}
+                />
+
+                <p className="mt-2 text-xs text-gray-600">
+                  <span className="font-semibold">{fileName}</span>
+                  <span className="block text-gray-500">
+                    Upload a clear photo to help the owner identify it.
+                    JPG/PNG/WebP/HEIC, up to {MAX_MB}MB.
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {filePreview ? (
+              <div
+                className="overflow-hidden rounded-2xl border bg-white shadow-sm"
+                style={{ borderColor: "rgba(11,44,92,0.15)" }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={filePreview}
                   alt="Preview"
-                  className="block h-40 w-full object-cover"
+                  className="block h-44 w-full object-cover"
                 />
+              </div>
+            ) : (
+              <div
+                className="grid h-44 place-items-center rounded-2xl border border-dashed bg-white text-center text-xs text-gray-500"
+                style={{ borderColor: "rgba(11,44,92,0.18)" }}
+              >
+                <div>
+                  <div className="text-lg">📷</div>
+                  <div className="mt-1">Preview appears here</div>
+                </div>
               </div>
             )}
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition
-                         hover:opacity-90 disabled:opacity-60"
-              style={{ backgroundColor: CREEK_RED }}
-            >
-              {submitting ? "Submitting..." : "Submit Report"}
-            </button>
-            <button
-              type="button"
-              onClick={() => history.back()}
-              disabled={submitting}
-              className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800
-                         disabled:opacity-60"
-              style={{ borderColor: "rgba(0,0,0,.1)", color: CREEK_NAVY }}
-            >
-              Cancel
-            </button>
+          <div
+            className="sticky bottom-4 rounded-2xl border bg-white/95 p-3 shadow-lg backdrop-blur"
+            style={{ borderColor: "rgba(11,44,92,0.15)" }}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-gray-600">
+                Submitting marks the item as{" "}
+                <span className="font-semibold">pending</span> for staff review.
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-md transition
+                             hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: CREEK_RED }}
+                >
+                  {submitting ? "Submitting..." : "Submit found item"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => history.back()}
+                  disabled={submitting}
+                  className="rounded-xl border px-4 py-2 text-sm font-semibold transition
+                             hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{
+                    borderColor: "rgba(11,44,92,0.25)",
+                    color: CREEK_NAVY,
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>
