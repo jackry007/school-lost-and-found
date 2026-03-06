@@ -17,6 +17,8 @@ import {
 import { CompactLogRow } from "@/components/admin/rows/CompactLogRow";
 
 type Props = {
+  items: Item[];
+
   totalItems: number;
   totalClaims: number;
   listedCount: number;
@@ -44,7 +46,14 @@ type Props = {
   onRejectItem: (itemId: number) => void;
   onEditItem: (it: Item) => void;
 
-  onOpenPhotos: (title: string, urls: string[]) => void;
+  onOpenPhotos: (data: {
+    title: string;
+    urls: string[];
+    category?: string;
+    location?: string;
+    description?: string;
+  }) => void;
+
   onOpenChat: (c: Claim) => void;
   onOpenSchedule: (c: Claim) => void;
   onApproveClaim: (c: Claim) => void;
@@ -65,6 +74,8 @@ function formatSchedChip(iso: string) {
 }
 
 export default function OverviewSection({
+  items,
+
   totalItems,
   totalClaims,
   listedCount,
@@ -97,9 +108,16 @@ export default function OverviewSection({
 }: Props) {
   const topCatsPreview = useMemo(() => topCats.slice(0, 4), [topCats]);
 
+  const itemsById = useMemo(() => {
+    const map: Record<number, Item> = {};
+    for (const it of items) {
+      map[it.id] = it;
+    }
+    return map;
+  }, [items]);
+
   return (
     <div className="mt-4 space-y-10">
-      {/* Analytics */}
       <section className="space-y-4">
         <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
@@ -180,7 +198,6 @@ export default function OverviewSection({
         </div>
       </section>
 
-      {/* Pending Snapshot */}
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -208,10 +225,9 @@ export default function OverviewSection({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Pending Items */}
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
-              <div className="text-xl font-semibold text-gray-900">
+              <div className="text-base font-semibold text-gray-900">
                 Pending Items{" "}
                 <span className="font-medium text-gray-500">
                   ({pendingItems.length})
@@ -228,42 +244,85 @@ export default function OverviewSection({
                   No pending items.
                 </div>
               ) : (
-                pendingItems.slice(0, 5).map((it) => (
-                  <Row key={it.id} className="px-4 py-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <Thumb src={thumbMap[it.id]} alt={it.title} />
-                      <RowInfo
-                        title={
-                          <span className="block truncate text-xl font-semibold text-gray-900">
-                            #{it.id} · {it.title}
-                          </span>
-                        }
-                        meta={
-                          <span className="block truncate text-gray-600">
-                            {it.category ?? "—"} · {(it as any).location ?? "—"}
-                          </span>
-                        }
-                      />
-                    </div>
+                pendingItems.slice(0, 5).map((it) => {
+                  const itemPhotos = [thumbMap[it.id]].filter(
+                    Boolean,
+                  ) as string[];
 
-                    <RowActions>
-                      <Btn tone="approve" onClick={() => onAskApproveItem(it)}>
-                        Approve
-                      </Btn>
-                      <Btn tone="reject" onClick={() => onRejectItem(it.id)}>
-                        Reject
-                      </Btn>
-                      <Btn tone="edit" onClick={() => onEditItem(it)}>
-                        Edit
-                      </Btn>
-                    </RowActions>
-                  </Row>
-                ))
+                  return (
+                    <Row
+                      key={it.id}
+                      className="px-4 py-3 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            itemPhotos.length
+                              ? onOpenPhotos({
+                                  title: `#${it.id} · ${it.title}`,
+                                  urls: itemPhotos,
+                                  category: it.category ?? undefined,
+                                  location: (it as any).location ?? undefined,
+                                  description: it.description ?? undefined,
+                                })
+                              : undefined
+                          }
+                          className="cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          title="Click to view photo"
+                          aria-label={`View photo for item ${it.id}`}
+                        >
+                          <Thumb src={thumbMap[it.id]} alt={it.title} />
+                        </button>
+
+                        <RowInfo
+                          title={
+                            <span
+                              className="block truncate text-base font-semibold text-gray-900"
+                              title={it.title}
+                            >
+                              #{it.id} · {it.title}
+                            </span>
+                          }
+                          meta={
+                            <span className="block truncate text-xs text-gray-600">
+                              {it.category ?? "—"} ·{" "}
+                              {(it as any).location ?? "—"}
+                            </span>
+                          }
+                        />
+                      </div>
+
+                      <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[180px] md:items-end">
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          <Btn tone="edit" onClick={() => onEditItem(it)}>
+                            Edit
+                          </Btn>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          <Btn
+                            tone="approve"
+                            onClick={() => onAskApproveItem(it)}
+                          >
+                            Approve
+                          </Btn>
+
+                          <Btn
+                            tone="reject"
+                            onClick={() => onRejectItem(it.id)}
+                          >
+                            Reject
+                          </Btn>
+                        </div>
+                      </div>
+                    </Row>
+                  );
+                })
               )}
             </div>
           </Card>
 
-          {/* Pending Claims */}
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
               <div className="text-xl font-semibold text-gray-900">
@@ -284,24 +343,70 @@ export default function OverviewSection({
                 </div>
               ) : (
                 pendingClaims.slice(0, 3).map((c) => {
+                  const item = itemsById[c.item_id];
                   const t = claimThumbs[c.id];
+
                   const sched = (c as any).schedule_at as
                     | string
                     | null
                     | undefined;
                   const schedChip = sched ? formatSchedChip(sched) : null;
 
+                  const claimViewerUrls = (
+                    t?.proofs?.length
+                      ? t.proofs
+                      : t?.itemThumb
+                        ? [t.itemThumb]
+                        : []
+                  ) as string[];
+
                   return (
-                    <Row key={c.id} className="px-5 py-5">
+                    <Row key={c.id} className="px-3 py-2">
                       <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            claimViewerUrls.length
+                              ? onOpenPhotos({
+                                  title: item?.title
+                                    ? `#${item.id} · ${item.title}`
+                                    : `Item #${c.item_id}`,
+                                  urls: claimViewerUrls,
+                                  category: item?.category ?? undefined,
+                                  location:
+                                    (item as any)?.location ?? undefined,
+                                  description:
+                                    item?.description ??
+                                    `Claim submitted by ${(c as any).claimant_name || "student"}`,
+                                })
+                              : undefined
+                          }
+                          className="cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          title={
+                            t?.proofs?.length
+                              ? "Click to view proof photos"
+                              : "Click to view item photo"
+                          }
+                          aria-label={
+                            t?.proofs?.length
+                              ? `View proof photos for claim ${c.id}`
+                              : `View item photo for claim ${c.id}`
+                          }
+                        >
+                          <Thumb
+                            src={t?.itemThumb}
+                            alt={`Item #${c.item_id}`}
+                          />
+                        </button>
 
                         <div className="min-w-0 flex-1">
-                          <div className="whitespace-nowrap text-lg font-semibold text-gray-900">
-                            Claim #{c.id} → Item #{c.item_id}
+                          <div className="text-base font-semibold text-gray-800 truncate">
+                            {item?.title
+                              ? `Claim #${c.id} → ${item.title}`
+                              : `Claim #${c.id} → Item #${c.item_id}`}
                           </div>
 
-                          <div className="mt-1 text-sm text-gray-600">
+                          <div className="mt-0.5 text-xs text-gray-600">
                             {(c as any).claimant_name}
                             <span className="text-gray-400">
                               {" "}
@@ -325,10 +430,18 @@ export default function OverviewSection({
                             <button
                               className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
                               onClick={() =>
-                                onOpenPhotos(
-                                  `Proof photos — Claim #${c.id}`,
-                                  t.proofs || [],
-                                )
+                                onOpenPhotos({
+                                  title: item?.title
+                                    ? `#${item.id} · ${item.title}`
+                                    : `Proof photos — Claim #${c.id}`,
+                                  urls: t.proofs || [],
+                                  category: item?.category ?? undefined,
+                                  location:
+                                    (item as any)?.location ?? undefined,
+                                  description:
+                                    item?.description ??
+                                    `Submitted by ${(c as any).claimant_name || "student"} · ${(c as any).claimant_email || ""}`,
+                                })
                               }
                               title="View proof photos"
                             >
@@ -367,7 +480,6 @@ export default function OverviewSection({
         </div>
       </section>
 
-      {/* Recent Activity */}
       <section className="space-y-3">
         <div className="flex items-center gap-3">
           <div

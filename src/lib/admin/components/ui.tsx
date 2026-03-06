@@ -349,10 +349,9 @@ export function StatusBadge({ status }: { status: ItemStatusWidened }) {
     </span>
   );
 }
-
 export function Thumb({ src, alt }: { src?: string; alt?: string }) {
   return (
-    <div className="mr-3 h-12 w-16 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+    <div className="mr-3 h-12 w-16 cursor-zoom-in overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src || FALLBACK_THUMB}

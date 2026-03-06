@@ -92,10 +92,31 @@ export default function AdminPage() {
   // Photo lightbox
   const [photoOpen, setPhotoOpen] = useState(false);
   const [photoTitle, setPhotoTitle] = useState("");
+  const [photoCategory, setPhotoCategory] = useState<string | undefined>();
+  const [photoLocation, setPhotoLocation] = useState<string | undefined>();
+  const [photoDescription, setPhotoDescription] = useState<
+    string | undefined
+  >();
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
-  function openPhotos(title: string, urls: string[]) {
+
+  function openPhotos({
+    title,
+    urls,
+    category,
+    location,
+    description,
+  }: {
+    title: string;
+    urls: string[];
+    category?: string;
+    location?: string;
+    description?: string;
+  }) {
     setPhotoTitle(title);
     setPhotoUrls(urls);
+    setPhotoCategory(category);
+    setPhotoLocation(location);
+    setPhotoDescription(description);
     setPhotoOpen(true);
   }
 
@@ -663,6 +684,7 @@ export default function AdminPage() {
 
         {tab === "Overview" && (
           <OverviewSection
+            items={items}
             totalItems={totalItems}
             totalClaims={totalClaims}
             listedCount={listedCount}
@@ -732,6 +754,9 @@ export default function AdminPage() {
       <PhotoLightboxModal
         open={photoOpen}
         title={photoTitle}
+        category={photoCategory}
+        location={photoLocation}
+        description={photoDescription}
         urls={photoUrls}
         onClose={() => setPhotoOpen(false)}
       />
