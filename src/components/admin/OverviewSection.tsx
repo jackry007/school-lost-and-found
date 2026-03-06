@@ -292,75 +292,71 @@ export default function OverviewSection({
                   const schedChip = sched ? formatSchedChip(sched) : null;
 
                   return (
-                    <Row key={c.id} className="px-4 py-4">
-                      <div className="flex min-w-0 items-center gap-3">
+                    <Row key={c.id} className="px-5 py-5">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
                         <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
 
-                        <RowInfo
-                          title={
-                            <div className="min-w-0">
-                              <div className="truncate text-xl font-semibold text-gray-900">
-                                Claim #{c.id} → Item #{c.item_id}
-                              </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="whitespace-nowrap text-lg font-semibold text-gray-900">
+                            Claim #{c.id} → Item #{c.item_id}
+                          </div>
 
-                              <div className="truncate text-gray-600">
-                                {(c as any).claimant_name}{" "}
-                                <span className="text-gray-400">
-                                  ({(c as any).claimant_email})
-                                </span>
-                                {(c as any).proof && (
-                                  <>
-                                    {" · "}
-                                    <span className="text-gray-500">
-                                      proof attached
-                                    </span>
-                                  </>
-                                )}
-                              </div>
+                          <div className="mt-1 text-sm text-gray-600">
+                            {(c as any).claimant_name}
+                            <span className="text-gray-400">
+                              {" "}
+                              ({(c as any).claimant_email})
+                            </span>
+                          </div>
 
-                              {schedChip && (
-                                <div className="mt-2">
-                                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
-                                    Scheduled: {schedChip}
-                                  </span>
-                                </div>
-                              )}
+                          {schedChip && (
+                            <div className="mt-2">
+                              <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
+                                Scheduled: {schedChip}
+                              </span>
                             </div>
-                          }
-                        />
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                        {t?.proofs?.length ? (
-                          <button
-                            className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-                            onClick={() =>
-                              onOpenPhotos(
-                                `Proof photos — Claim #${c.id}`,
-                                t.proofs || [],
-                              )
-                            }
-                            title="View proof photos"
+                      <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[240px] md:items-end">
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          {t?.proofs?.length ? (
+                            <button
+                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                              onClick={() =>
+                                onOpenPhotos(
+                                  `Proof photos — Claim #${c.id}`,
+                                  t.proofs || [],
+                                )
+                              }
+                              title="View proof photos"
+                            >
+                              View Proofs ({t.proofs.length})
+                            </button>
+                          ) : null}
+
+                          <Btn tone="message" onClick={() => onOpenChat(c)}>
+                            Message
+                          </Btn>
+
+                          <Btn
+                            tone="schedule"
+                            onClick={() => onOpenSchedule(c)}
                           >
-                            View Proofs ({t.proofs.length})
-                          </button>
-                        ) : null}
+                            {schedChip ? "Reschedule" : "Schedule"}
+                          </Btn>
+                        </div>
 
-                        <Btn tone="message" onClick={() => onOpenChat(c)}>
-                          Message
-                        </Btn>
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          <Btn tone="approve" onClick={() => onApproveClaim(c)}>
+                            Approve
+                          </Btn>
 
-                        <Btn tone="schedule" onClick={() => onOpenSchedule(c)}>
-                          {schedChip ? "Reschedule" : "Schedule"}
-                        </Btn>
-
-                        <Btn tone="approve" onClick={() => onApproveClaim(c)}>
-                          Approve
-                        </Btn>
-
-                        <Btn tone="reject" onClick={() => onRejectClaim(c)}>
-                          Reject
-                        </Btn>
+                          <Btn tone="reject" onClick={() => onRejectClaim(c)}>
+                            Reject
+                          </Btn>
+                        </div>
                       </div>
                     </Row>
                   );

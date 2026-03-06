@@ -131,7 +131,7 @@ export function Row({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-3 rounded-2xl bg-white p-4 ${className}`}
+      className={`flex flex-col gap-4 bg-white p-4 md:flex-row md:items-start md:justify-between ${className}`}
     >
       {children}
     </div>
@@ -192,7 +192,7 @@ export function Btn({
     | "ghost";
 }) {
   const base =
-    "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-sm font-medium transition shadow-sm disabled:opacity-60 disabled:cursor-not-allowed";
+    "inline-flex min-w-[96px] items-center justify-center rounded-full px-3 py-1 text-sm font-medium transition shadow-sm disabled:cursor-not-allowed disabled:opacity-60";
 
   if (tone === "approve") {
     return (
