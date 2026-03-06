@@ -96,53 +96,51 @@ export default function ItemForm() {
       return;
     }
 
-    if (file && file.size > 0) {
-      const fileMb = file.size / (1024 * 1024);
-      if (fileMb > MAX_MB) {
-        setErr(
-          `Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`,
-        );
-        setSubmitting(false);
-        return;
-      }
-      if (
-        ALLOWED_MIME.length &&
-        file.type &&
-        !ALLOWED_MIME.includes(file.type)
-      ) {
-        setErr("Unsupported image type. Please upload JPG/PNG/WebP/HEIC.");
-        setSubmitting(false);
-        return;
-      }
+    // Photo is REQUIRED
+    if (!file || file.size === 0) {
+      setErr("Please upload a photo of the item.");
+      setSubmitting(false);
+      return;
     }
 
-    // 1) Upload photo (if provided)
+    // Validate photo
+    const fileMb = file.size / (1024 * 1024);
+    if (fileMb > MAX_MB) {
+      setErr(`Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`);
+      setSubmitting(false);
+      return;
+    }
+    if (ALLOWED_MIME.length && file.type && !ALLOWED_MIME.includes(file.type)) {
+      setErr("Unsupported image type. Please upload JPG/PNG/WebP/HEIC.");
+      setSubmitting(false);
+      return;
+    }
+
+    // 1) Upload photo (required)
     let photo_path: string | null = null;
-    if (file && file.size > 0) {
-      try {
-        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-        const path = `public/${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}.${ext}`;
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `public/${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.${ext}`;
 
-        const { error: uploadErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, file, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: file.type || undefined,
-          });
+      const { error: uploadErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || undefined,
+        });
 
-        if (uploadErr) throw uploadErr;
-        photo_path = path;
-      } catch (e: any) {
-        setErr(`Photo upload failed: ${e?.message || e}`);
-        setSubmitting(false);
-        return;
-      }
+      if (uploadErr) throw uploadErr;
+      photo_path = path;
+    } catch (e: any) {
+      setErr(`Photo upload failed: ${e?.message || e}`);
+      setSubmitting(false);
+      return;
     }
 
-    // 2) Insert DB row (UNCHANGED)
+    // 2) Insert DB row
     try {
       const { error: insertErr } = await supabase.from("items").insert([
         {
@@ -320,7 +318,7 @@ export default function ItemForm() {
                 value={dateFound}
                 onChange={setDateFound}
                 creekRed={CREEK_RED}
-                creekNavy={"#0B2C5C"}
+                creekNavy={CREEK_NAVY}
                 required
               />
 
@@ -362,7 +360,7 @@ export default function ItemForm() {
                 className="mb-1 block text-sm font-semibold"
                 style={{ color: CREEK_NAVY }}
               >
-                Photo (optional)
+                Photo <span style={{ color: CREEK_RED }}>*</span>
               </span>
 
               <div
@@ -373,6 +371,7 @@ export default function ItemForm() {
                   type="file"
                   name="photo"
                   accept="image/*"
+                  required
                   className="w-full text-sm outline-none
                              file:mr-3 file:rounded-md file:border-0
                              file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold
