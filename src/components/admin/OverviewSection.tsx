@@ -9,7 +9,6 @@ import {
   StatCard,
   Row,
   RowInfo,
-  RowActions,
   Btn,
   Thumb,
   SectionHeading,
@@ -43,7 +42,7 @@ type Props = {
   onViewAllQueues: () => void;
 
   onAskApproveItem: (it: Item) => void;
-  onRejectItem: (itemId: number) => void;
+  onAskRejectItem: (it: Item) => void;
   onEditItem: (it: Item) => void;
 
   onOpenPhotos: (data: {
@@ -56,8 +55,8 @@ type Props = {
 
   onOpenChat: (c: Claim) => void;
   onOpenSchedule: (c: Claim) => void;
-  onApproveClaim: (c: Claim) => void;
-  onRejectClaim: (c: Claim) => void;
+  onAskApproveClaim: (c: Claim) => void;
+  onAskRejectClaim: (c: Claim) => void;
 };
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -106,14 +105,14 @@ export default function OverviewSection({
   onViewAllQueues,
 
   onAskApproveItem,
-  onRejectItem,
+  onAskRejectItem,
   onEditItem,
 
   onOpenPhotos,
   onOpenChat,
   onOpenSchedule,
-  onApproveClaim,
-  onRejectClaim,
+  onAskApproveClaim,
+  onAskRejectClaim,
 }: Props) {
   const topCatsPreview = useMemo(() => topCats.slice(0, 4), [topCats]);
 
@@ -325,14 +324,20 @@ export default function OverviewSection({
                         />
                       </div>
 
-                      <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[180px] md:items-end">
-                        <div className="flex flex-wrap gap-2 md:justify-end">
+                      <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 md:w-auto md:min-w-[180px] md:items-end">
+                        <div
+                          className="flex flex-wrap gap-2 md:justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Btn tone="edit" onClick={() => onEditItem(it)}>
                             Edit
                           </Btn>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 md:justify-end">
+                        <div
+                          className="flex flex-wrap gap-2 md:justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Btn
                             tone="approve"
                             onClick={() => onAskApproveItem(it)}
@@ -342,7 +347,7 @@ export default function OverviewSection({
 
                           <Btn
                             tone="reject"
-                            onClick={() => onRejectItem(it.id)}
+                            onClick={() => onAskRejectItem(it)}
                           >
                             Reject
                           </Btn>
@@ -461,11 +466,14 @@ export default function OverviewSection({
                         </div>
                       </div>
 
-                      <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[240px] md:items-end">
-                        <div className="flex flex-wrap gap-2 md:justify-end">
+                      <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 md:w-auto md:min-w-[240px] md:items-end">
+                        <div
+                          className="flex flex-wrap gap-2 md:justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {t?.proofs?.length ? (
                             <button
-                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-md active:scale-[0.98]"
                               onClick={() =>
                                 onOpenPhotos({
                                   title: item?.title
@@ -498,12 +506,21 @@ export default function OverviewSection({
                           </Btn>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 md:justify-end">
-                          <Btn tone="approve" onClick={() => onApproveClaim(c)}>
+                        <div
+                          className="flex flex-wrap gap-2 md:justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Btn
+                            tone="approve"
+                            onClick={() => onAskApproveClaim(c)}
+                          >
                             Approve
                           </Btn>
 
-                          <Btn tone="reject" onClick={() => onRejectClaim(c)}>
+                          <Btn
+                            tone="reject"
+                            onClick={() => onAskRejectClaim(c)}
+                          >
                             Reject
                           </Btn>
                         </div>

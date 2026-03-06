@@ -192,7 +192,7 @@ export function Btn({
     | "ghost";
 }) {
   const base =
-    "inline-flex min-w-[96px] items-center justify-center rounded-full px-3 py-1 text-sm font-medium transition shadow-sm disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex min-w-[96px] items-center justify-center rounded-full px-3 py-1 text-sm font-medium shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm";
 
   if (tone === "approve") {
     return (
