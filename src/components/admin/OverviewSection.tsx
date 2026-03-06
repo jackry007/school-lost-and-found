@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import type { Item, Claim } from "@/lib/types";
-import type { ItemStatusWidened } from "@/lib/admin/selectors";
+import { CREEK_NAVY, CREEK_RED } from "@/lib/admin/constants";
 
 import {
   Card,
@@ -16,7 +17,6 @@ import {
 import { CompactLogRow } from "@/components/admin/rows/CompactLogRow";
 
 type Props = {
-  // stats
   totalItems: number;
   totalClaims: number;
   listedCount: number;
@@ -25,7 +25,6 @@ type Props = {
   rejectedCount: number;
   topCats: Array<[string, number]>;
 
-  // pending snapshot data
   pendingItems: Item[];
   pendingClaims: Claim[];
   thumbMap: Record<number, string>;
@@ -34,13 +33,11 @@ type Props = {
     { itemThumb?: string; proofs?: string[] } | undefined
   >;
 
-  // activity preview (same behavior as your page)
   logLoadedOnce: boolean;
   logLoading: boolean;
   logRows: any[];
   onOpenActivityTab: () => void;
 
-  // overview actions
   onViewAllQueues: () => void;
 
   onAskApproveItem: (it: Item) => void;
@@ -54,8 +51,20 @@ type Props = {
   onRejectClaim: (c: Claim) => void;
 };
 
+function formatSchedChip(iso: string) {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${date} · ${time}`;
+}
+
 export default function OverviewSection({
-  // stats
   totalItems,
   totalClaims,
   listedCount,
@@ -64,103 +73,168 @@ export default function OverviewSection({
   rejectedCount,
   topCats,
 
-  // pending snapshot
   pendingItems,
   pendingClaims,
   thumbMap,
   claimThumbs,
 
-  // activity preview
   logLoadedOnce,
   logLoading,
   logRows,
   onOpenActivityTab,
 
-  // nav
   onViewAllQueues,
 
-  // item actions
   onAskApproveItem,
   onRejectItem,
   onEditItem,
 
-  // claim actions
   onOpenPhotos,
   onOpenChat,
   onOpenSchedule,
   onApproveClaim,
   onRejectClaim,
 }: Props) {
+  const topCatsPreview = useMemo(() => topCats.slice(0, 4), [topCats]);
+
   return (
-    <div className="space-y-8 mt-4">
+    <div className="mt-4 space-y-10">
       {/* Analytics */}
-      <section>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Total items" value={totalItems} tint="#EFF6FF" />
-          <StatCard label="Total claims" value={totalClaims} tint="#FEF2F2" />
-          <StatCard label="Listed" value={listedCount} tint="#eef7ff" />
-          <StatCard label="On Hold" value={onHoldCount} tint="#fff7ee" />
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Pending" value={pendingCount} tint="#fff6e8" />
-          <StatCard label="Rejected" value={rejectedCount} tint="#fdeff0" />
-
-          <Card className="p-4 md:col-span-2">
-            <div className="mb-2 text-xs text-gray-500">
-              Top categories (30d)
+      <section className="space-y-4">
+        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium tracking-wide text-gray-500">
+                Creek Lost &amp; Found
+              </div>
+              <div className="text-[2rem] font-semibold tracking-tight text-gray-900">
+                Moderation Dashboard
+              </div>
             </div>
-            {topCats.length ? (
-              <ul className="space-y-1 text-sm">
-                {topCats.map(([k, v]) => (
-                  <li key={k} className="flex justify-between">
-                    <span className="truncate">{k}</span>
-                    <span className="ml-2 text-gray-700">{v}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-sm text-gray-600">—</div>
-            )}
-          </Card>
+
+            <div
+              className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              style={{ background: CREEK_NAVY }}
+            >
+              Admin Overview
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <StatCard label="Total items" value={totalItems} tint="#FFFFFF" />
+            <StatCard label="Total claims" value={totalClaims} tint="#FFFFFF" />
+            <StatCard label="Listed" value={listedCount} tint="#EEF2FF" />
+            <StatCard label="Pending" value={pendingCount} tint="#FEF2F3" />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <Card className="p-4 md:col-span-1">
+              <div className="text-sm font-medium text-gray-500">Secondary</div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <div className="text-sm text-gray-500">On Hold</div>
+                  <div className="mt-2 text-2xl font-semibold text-gray-900">
+                    {onHoldCount}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                  <div className="text-sm text-gray-500">Rejected</div>
+                  <div className="mt-2 text-2xl font-semibold text-gray-900">
+                    {rejectedCount}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 md:col-span-2">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-sm font-medium text-gray-500">
+                  Top categories (30d)
+                </div>
+                <div className="text-sm text-gray-400">
+                  top {topCatsPreview.length || 0}
+                </div>
+              </div>
+
+              {topCatsPreview.length ? (
+                <ul className="space-y-3">
+                  {topCatsPreview.map(([k, v]) => (
+                    <li
+                      key={k}
+                      className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3"
+                    >
+                      <span className="truncate font-medium text-gray-900">
+                        {k}
+                      </span>
+                      <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                        {v}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm text-gray-600">—</div>
+              )}
+            </Card>
+          </div>
         </div>
       </section>
 
-      {/* Pending Snapshots */}
+      {/* Pending Snapshot */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <SectionHeading>Pending Snapshot</SectionHeading>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="h-7 w-1.5 rounded-full"
+              style={{ background: CREEK_NAVY }}
+              aria-hidden
+            />
+            <SectionHeading>Pending Snapshot</SectionHeading>
+            <span
+              className="hidden rounded-full border px-3 py-1 text-sm font-semibold md:inline-flex"
+              style={{
+                color: CREEK_RED,
+                borderColor: "#FBCFE8",
+                background: "#FFF1F2",
+              }}
+            >
+              Action required
+            </span>
+          </div>
+
           <Btn tone="ghost" onClick={onViewAllQueues}>
             View all in Queues →
           </Btn>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Pending Items (Top 5) */}
-          <Card className="p-0">
-            <div className="flex items-center justify-between p-4">
-              <div className="font-medium">
+          {/* Pending Items */}
+          <Card className="overflow-hidden p-0">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
+              <div className="text-xl font-semibold text-gray-900">
                 Pending Items{" "}
-                <span className="text-gray-500">({pendingItems.length})</span>
+                <span className="font-medium text-gray-500">
+                  ({pendingItems.length})
+                </span>
               </div>
               {pendingItems.length > 5 && (
-                <span className="text-xs text-gray-500 pr-2">showing 5</span>
+                <span className="pr-2 text-sm text-gray-500">showing 5</span>
               )}
             </div>
 
-            <div className="divide-y">
+            <div className="divide-y divide-gray-100">
               {pendingItems.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-gray-600">
                   No pending items.
                 </div>
               ) : (
                 pendingItems.slice(0, 5).map((it) => (
-                  <Row key={it.id} className="px-3 py-2">
+                  <Row key={it.id} className="px-4 py-4">
                     <div className="flex min-w-0 items-center gap-3">
                       <Thumb src={thumbMap[it.id]} alt={it.title} />
                       <RowInfo
                         title={
-                          <span className="block truncate max-w-[18rem] sm:max-w-[24rem]">
+                          <span className="block truncate text-xl font-semibold text-gray-900">
                             #{it.id} · {it.title}
                           </span>
                         }
@@ -171,14 +245,15 @@ export default function OverviewSection({
                         }
                       />
                     </div>
+
                     <RowActions>
-                      <Btn tone="primary" onClick={() => onAskApproveItem(it)}>
+                      <Btn tone="approve" onClick={() => onAskApproveItem(it)}>
                         Approve
                       </Btn>
-                      <Btn tone="danger" onClick={() => onRejectItem(it.id)}>
+                      <Btn tone="reject" onClick={() => onRejectItem(it.id)}>
                         Reject
                       </Btn>
-                      <Btn tone="ghost" onClick={() => onEditItem(it)}>
+                      <Btn tone="edit" onClick={() => onEditItem(it)}>
                         Edit
                       </Btn>
                     </RowActions>
@@ -188,19 +263,21 @@ export default function OverviewSection({
             </div>
           </Card>
 
-          {/* Pending Claims (Top 3) */}
-          <Card className="p-0">
-            <div className="flex items-center justify-between p-4">
-              <div className="font-medium">
+          {/* Pending Claims */}
+          <Card className="overflow-hidden p-0">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
+              <div className="text-xl font-semibold text-gray-900">
                 Pending Claims{" "}
-                <span className="text-gray-500">({pendingClaims.length})</span>
+                <span className="font-medium text-gray-500">
+                  ({pendingClaims.length})
+                </span>
               </div>
               {pendingClaims.length > 3 && (
-                <span className="text-xs text-gray-500 pr-2">showing 3</span>
+                <span className="pr-2 text-sm text-gray-500">showing 3</span>
               )}
             </div>
 
-            <div className="divide-y">
+            <div className="divide-y divide-gray-100">
               {pendingClaims.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-gray-600">
                   No pending claims.
@@ -212,47 +289,51 @@ export default function OverviewSection({
                     | string
                     | null
                     | undefined;
-
-                  const schedChip = sched
-                    ? new Date(sched).toLocaleString()
-                    : null;
+                  const schedChip = sched ? formatSchedChip(sched) : null;
 
                   return (
-                    <Row key={c.id} className="px-3 py-2">
+                    <Row key={c.id} className="px-4 py-4">
                       <div className="flex min-w-0 items-center gap-3">
                         <Thumb src={t?.itemThumb} alt={`Item #${c.item_id}`} />
+
                         <RowInfo
                           title={
-                            <>
-                              Claim #{c.id} → Item #{c.item_id}
-                              {schedChip && (
-                                <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800">
-                                  {schedChip}
+                            <div className="min-w-0">
+                              <div className="truncate text-xl font-semibold text-gray-900">
+                                Claim #{c.id} → Item #{c.item_id}
+                              </div>
+
+                              <div className="truncate text-gray-600">
+                                {(c as any).claimant_name}{" "}
+                                <span className="text-gray-400">
+                                  ({(c as any).claimant_email})
                                 </span>
-                              )}
-                            </>
-                          }
-                          meta={
-                            <>
-                              {(c as any).claimant_name} (
-                              {(c as any).claimant_email})
-                              {(c as any).proof && (
-                                <>
-                                  {" · "}
-                                  <span className="text-gray-500">
-                                    proof attached
+                                {(c as any).proof && (
+                                  <>
+                                    {" · "}
+                                    <span className="text-gray-500">
+                                      proof attached
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+
+                              {schedChip && (
+                                <div className="mt-2">
+                                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
+                                    Scheduled: {schedChip}
                                   </span>
-                                </>
+                                </div>
                               )}
-                            </>
+                            </div>
                           }
                         />
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                         {t?.proofs?.length ? (
                           <button
-                            className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                            className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
                             onClick={() =>
                               onOpenPhotos(
                                 `Proof photos — Claim #${c.id}`,
@@ -265,16 +346,19 @@ export default function OverviewSection({
                           </button>
                         ) : null}
 
-                        <Btn tone="ghost" onClick={() => onOpenChat(c)}>
+                        <Btn tone="message" onClick={() => onOpenChat(c)}>
                           Message
                         </Btn>
-                        <Btn tone="ghost" onClick={() => onOpenSchedule(c)}>
+
+                        <Btn tone="schedule" onClick={() => onOpenSchedule(c)}>
                           {schedChip ? "Reschedule" : "Schedule"}
                         </Btn>
-                        <Btn tone="primary" onClick={() => onApproveClaim(c)}>
+
+                        <Btn tone="approve" onClick={() => onApproveClaim(c)}>
                           Approve
                         </Btn>
-                        <Btn tone="danger" onClick={() => onRejectClaim(c)}>
+
+                        <Btn tone="reject" onClick={() => onRejectClaim(c)}>
                           Reject
                         </Btn>
                       </div>
@@ -287,10 +371,18 @@ export default function OverviewSection({
         </div>
       </section>
 
-      {/* Recent Activity (preview) */}
+      {/* Recent Activity */}
       <section className="space-y-3">
-        <SectionHeading>Recent Activity</SectionHeading>
-        <Card>
+        <div className="flex items-center gap-3">
+          <div
+            className="h-7 w-1.5 rounded-full"
+            style={{ background: CREEK_NAVY }}
+            aria-hidden
+          />
+          <SectionHeading>Recent Activity</SectionHeading>
+        </div>
+
+        <Card className="overflow-hidden p-0">
           {!logLoadedOnce ? (
             <div className="p-4 text-sm text-gray-500">
               Open the Activity tab to load logs…
@@ -302,7 +394,7 @@ export default function OverviewSection({
               No activity yet.
             </div>
           ) : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-gray-100">
               {logRows.slice(0, 8).map((r) => (
                 <CompactLogRow key={r.event_id ?? r.id} row={r} />
               ))}
