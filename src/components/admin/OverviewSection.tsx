@@ -60,6 +60,15 @@ type Props = {
   onRejectClaim: (c: Claim) => void;
 };
 
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const BUCKET = "item-photos";
+
+function publicUrlFromPath(path?: string | null) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${SB_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+}
+
 function formatSchedChip(iso: string) {
   const d = new Date(iso);
   const date = d.toLocaleDateString(undefined, {
@@ -115,6 +124,33 @@ export default function OverviewSection({
     }
     return map;
   }, [items]);
+
+  function getItemPreviewSrc(it?: Item) {
+    if (!it) return "";
+    const photoUrl = publicUrlFromPath((it as any).photo_url);
+    return photoUrl || thumbMap[it.id] || "";
+  }
+
+  function getItemDescription(it?: Item) {
+    if (!it) return undefined;
+    const desc = (
+      ((it as any).description || (it as any).notes || "") as string
+    ).trim();
+    return desc || undefined;
+  }
+
+  function openItemPhotos(it: Item) {
+    const src = getItemPreviewSrc(it);
+    if (!src) return;
+
+    onOpenPhotos({
+      title: `#${it.id} · ${it.title}`,
+      urls: [src],
+      category: it.category ?? undefined,
+      location: (it as any).location ?? undefined,
+      description: getItemDescription(it),
+    });
+  }
 
   return (
     <div className="mt-4 space-y-10">
@@ -245,34 +281,30 @@ export default function OverviewSection({
                 </div>
               ) : (
                 pendingItems.slice(0, 5).map((it) => {
-                  const itemPhotos = [thumbMap[it.id]].filter(
-                    Boolean,
-                  ) as string[];
+                  const previewSrc = getItemPreviewSrc(it);
+                  const hasPhoto = Boolean(previewSrc);
 
                   return (
                     <Row
                       key={it.id}
-                      className="px-4 py-3 hover:bg-gray-50 transition"
+                      className="px-4 py-3 transition hover:bg-gray-50"
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <button
                           type="button"
                           onClick={() =>
-                            itemPhotos.length
-                              ? onOpenPhotos({
-                                  title: `#${it.id} · ${it.title}`,
-                                  urls: itemPhotos,
-                                  category: it.category ?? undefined,
-                                  location: (it as any).location ?? undefined,
-                                  description: it.description ?? undefined,
-                                })
-                              : undefined
+                            hasPhoto ? openItemPhotos(it) : undefined
                           }
-                          className="cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
-                          title="Click to view photo"
+                          disabled={!hasPhoto}
+                          className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
+                          title={
+                            hasPhoto
+                              ? "Click to view photo"
+                              : "No photo available"
+                          }
                           aria-label={`View photo for item ${it.id}`}
                         >
-                          <Thumb src={thumbMap[it.id]} alt={it.title} />
+                          <Thumb src={previewSrc} alt={it.title} />
                         </button>
 
                         <RowInfo
@@ -352,12 +384,16 @@ export default function OverviewSection({
                     | undefined;
                   const schedChip = sched ? formatSchedChip(sched) : null;
 
+                  const itemPreviewSrc = getItemPreviewSrc(item);
+
                   const claimViewerUrls = (
                     t?.proofs?.length
                       ? t.proofs
                       : t?.itemThumb
                         ? [t.itemThumb]
-                        : []
+                        : itemPreviewSrc
+                          ? [itemPreviewSrc]
+                          : []
                   ) as string[];
 
                   return (
@@ -376,12 +412,13 @@ export default function OverviewSection({
                                   location:
                                     (item as any)?.location ?? undefined,
                                   description:
-                                    item?.description ??
+                                    getItemDescription(item) ??
                                     `Claim submitted by ${(c as any).claimant_name || "student"}`,
                                 })
                               : undefined
                           }
-                          className="cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          disabled={!claimViewerUrls.length}
+                          className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
                           title={
                             t?.proofs?.length
                               ? "Click to view proof photos"
@@ -394,13 +431,13 @@ export default function OverviewSection({
                           }
                         >
                           <Thumb
-                            src={t?.itemThumb}
+                            src={t?.itemThumb || itemPreviewSrc}
                             alt={`Item #${c.item_id}`}
                           />
                         </button>
 
                         <div className="min-w-0 flex-1">
-                          <div className="text-base font-semibold text-gray-800 truncate">
+                          <div className="truncate text-base font-semibold text-gray-800">
                             {item?.title
                               ? `Claim #${c.id} → ${item.title}`
                               : `Claim #${c.id} → Item #${c.item_id}`}
@@ -439,7 +476,7 @@ export default function OverviewSection({
                                   location:
                                     (item as any)?.location ?? undefined,
                                   description:
-                                    item?.description ??
+                                    getItemDescription(item) ??
                                     `Submitted by ${(c as any).claimant_name || "student"} · ${(c as any).claimant_email || ""}`,
                                 })
                               }
