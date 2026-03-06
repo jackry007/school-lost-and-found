@@ -1,7 +1,7 @@
 export const CREEK_RED = "#b10015";
-export const CREEK_NAVY = "#0f2741";
-export const CREEK_SOFTR = "#fef2f3";
-export const CREEK_SOFTN = "#f1f5fb";
+export const CREEK_NAVY = "#1F4ED8";
+export const CREEK_SOFTR = "#FEF2F3";
+export const CREEK_SOFTN = "#EEF2FF";
 
 export const BUCKET = "item-photos";
 export const CLAIM_BUCKET = "claim-photos";
@@ -14,5 +14,5 @@ export const FALLBACK_THUMB =
       <text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle'
             font-family='system-ui, -apple-system, Segoe UI, Roboto, sans-serif'
             font-size='12' fill='#9ca3af'>no image</text>
-    </svg>`
+    </svg>`,
   );

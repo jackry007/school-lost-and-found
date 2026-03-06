@@ -1,4 +1,3 @@
-// src/lib/admin/components/ui.tsx
 "use client";
 
 import React from "react";
@@ -28,7 +27,7 @@ export function Labeled({
 
 export function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2 text-lg font-semibold">
+    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
       {children}
     </h2>
   );
@@ -39,16 +38,20 @@ export function Badge({
   tone = "gray",
 }: {
   children: React.ReactNode;
-  tone?: "gray" | "amber" | "green" | "red";
+  tone?: "gray" | "amber" | "green" | "red" | "blue";
 }) {
   const tones: Record<string, string> = {
     gray: "bg-gray-100 text-gray-700",
     amber: "bg-amber-100 text-amber-800",
     green: "bg-emerald-100 text-emerald-800",
     red: "bg-rose-100 text-rose-800",
+    blue: "bg-blue-100 text-blue-800",
   };
+
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}
+    >
       {children}
     </span>
   );
@@ -81,11 +84,13 @@ export function StatCard({
 }) {
   return (
     <div
-      className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
-      style={{ background: `linear-gradient(180deg, ${tint} 0%, white 60%)` }}
+      className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+      style={{ background: `linear-gradient(180deg, ${tint} 0%, white 65%)` }}
     >
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="text-sm text-gray-500">{label}</div>
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-gray-900">
+        {value}
+      </div>
     </div>
   );
 }
@@ -126,7 +131,7 @@ export function Row({
 }) {
   return (
     <div
-      className={`flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}
+      className={`flex flex-col gap-4 bg-white p-4 md:flex-row md:items-start md:justify-between ${className}`}
     >
       {children}
     </div>
@@ -150,9 +155,9 @@ export function RowInfo({
 }) {
   return (
     <div className="min-w-0">
-      <div className="truncate font-medium">{title}</div>
+      <div className="truncate font-medium text-gray-900">{title}</div>
       {meta && (
-        <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-600">
+        <div className="mt-1 flex items-center gap-1 text-sm text-gray-600">
           {meta}
         </div>
       )}
@@ -161,80 +166,147 @@ export function RowInfo({
 }
 
 export function RowActions({ children }: { children: React.ReactNode }) {
-  return <div className="flex shrink-0 gap-2">{children}</div>;
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>
+  );
 }
 
 export function Btn({
   children,
   onClick,
-  tone = "primary",
+  tone = "approve",
   disabled,
-}: {
+  className = "",
+  style,
+  type = "button",
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   children: React.ReactNode;
-  onClick?: () => void;
-  tone?: "primary" | "secondary" | "danger" | "ghost" | "success";
-  disabled?: boolean;
+  tone?:
+    | "approve"
+    | "reject"
+    | "message"
+    | "schedule"
+    | "edit"
+    | "success"
+    | "ghost";
 }) {
-  const base = "rounded-full px-3 py-1.5 text-sm";
-  if (tone === "primary")
+  const base =
+    "inline-flex min-w-[96px] items-center justify-center rounded-full px-3 py-1 text-sm font-medium transition shadow-sm disabled:cursor-not-allowed disabled:opacity-60";
+
+  if (tone === "approve") {
     return (
       <button
+        type={type}
         onClick={onClick}
         disabled={disabled}
-        className={`${base} text-white shadow-sm disabled:opacity-60`}
-        style={{
-          background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-        }}
+        className={`${base} text-white hover:brightness-95 ${className}`}
+        style={{ background: CREEK_NAVY, ...style }}
+        {...rest}
       >
         {children}
       </button>
     );
-  if (tone === "danger")
+  }
+
+  if (tone === "reject") {
     return (
       <button
+        type={type}
         onClick={onClick}
         disabled={disabled}
-        className={`${base} text-white shadow-sm disabled:opacity-60`}
-        style={{
-          background: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
-        }}
+        className={`${base} text-white hover:brightness-95 ${className}`}
+        style={{ background: CREEK_RED, ...style }}
+        {...rest}
       >
         {children}
       </button>
     );
-  if (tone === "success")
+  }
+
+  if (tone === "message") {
     return (
       <button
+        type={type}
         onClick={onClick}
         disabled={disabled}
-        className={`${base} text-white shadow-sm disabled:opacity-60`}
+        className={`${base} border hover:bg-slate-100 ${className}`}
         style={{
-          background: "linear-gradient(135deg, #10b981 0%, #065f46 100%)",
+          background: "#F8FAFC",
+          color: "#475569",
+          borderColor: "#CBD5E1",
+          ...style,
         }}
+        {...rest}
       >
         {children}
       </button>
     );
-  if (tone === "secondary")
+  }
+
+  if (tone === "schedule") {
     return (
       <button
+        type={type}
         onClick={onClick}
         disabled={disabled}
-        className={`${base} border text-[13px] disabled:opacity-60`}
+        className={`${base} border hover:brightness-95 ${className}`}
         style={{
-          color: CREEK_NAVY,
-          borderColor: CREEK_NAVY,
+          background: "#FFF7ED",
+          color: "#B45309",
+          borderColor: "#FCD34D",
+          ...style,
+        }}
+        {...rest}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  if (tone === "edit") {
+    return (
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} border hover:brightness-95 ${className}`}
+        style={{
           background: CREEK_SOFTN,
+          color: CREEK_NAVY,
+          borderColor: "#BFDBFE",
+          ...style,
         }}
+        {...rest}
       >
         {children}
       </button>
     );
+  }
+
+  if (tone === "success") {
+    return (
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        className={`${base} text-white hover:brightness-95 ${className}`}
+        style={{ background: "#15803D", ...style }}
+        {...rest}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${base} text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60`}
+      className={`${base} border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 ${className}`}
+      style={style}
+      {...rest}
     >
       {children}
     </button>
@@ -253,30 +325,33 @@ export function StatusBadge({ status }: { status: ItemStatusWidened }) {
     status === "claimed"
       ? "bg-emerald-100 text-emerald-800"
       : status === "on_hold"
-      ? "bg-amber-100 text-amber-800"
-      : status === "listed"
-      ? "bg-green-100 text-green-800"
-      : status === "pending"
-      ? "bg-amber-100 text-amber-800"
-      : status === "rejected"
-      ? "bg-rose-100 text-rose-800"
-      : "bg-gray-100 text-gray-800";
+        ? "bg-amber-100 text-amber-800"
+        : status === "listed"
+          ? "bg-blue-100 text-blue-800"
+          : status === "pending"
+            ? "bg-amber-100 text-amber-800"
+            : status === "rejected"
+              ? "bg-rose-100 text-rose-800"
+              : "bg-gray-100 text-gray-800";
+
   const label =
     status === "claimed"
       ? "Picked Up"
       : status === "on_hold"
-      ? "On Hold"
-      : status.charAt(0).toUpperCase() + status.slice(1);
+        ? "On Hold"
+        : status.charAt(0).toUpperCase() + status.slice(1);
+
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] ${look}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${look}`}
+    >
       {label}
     </span>
   );
 }
-
 export function Thumb({ src, alt }: { src?: string; alt?: string }) {
   return (
-    <div className="mr-3 h-12 w-16 overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+    <div className="mr-3 h-12 w-16 cursor-zoom-in overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src || FALLBACK_THUMB}

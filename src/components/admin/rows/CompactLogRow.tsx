@@ -21,7 +21,7 @@ export function CompactLogRow({ row }: CompactLogRowProps) {
   const who = row.actor_name ?? row.actor_uid ?? null;
 
   return (
-    <li className="px-3 py-2 flex items-start justify-between gap-3 text-[13px]">
+    <div className="px-3 py-2 flex items-start justify-between gap-3 text-[13px]">
       <div className="min-w-0 flex items-center gap-2">
         {/* Entity badge */}
         <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-800">
@@ -51,6 +51,6 @@ export function CompactLogRow({ row }: CompactLogRowProps) {
       <div className="shrink-0 text-[11px] text-gray-500">
         {ts ? new Date(ts).toLocaleString() : ""}
       </div>
-    </li>
+    </div>
   );
 }
