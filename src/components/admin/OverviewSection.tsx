@@ -534,7 +534,7 @@ export default function OverviewSection({
         </div>
       </section>
 
-      <section className="space-y-3">
+      {/* <section className="space-y-3">
         <div className="flex items-center gap-3">
           <div
             className="h-7 w-1.5 rounded-full"
@@ -569,7 +569,7 @@ export default function OverviewSection({
             Open full Activity Log →
           </Btn>
         </div>
-      </section>
+      </section> */}
     </div>
   );
 }
