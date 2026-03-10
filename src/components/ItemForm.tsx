@@ -71,58 +71,52 @@ export default function ItemForm() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitting) return;
+
     setErr(null);
     setSubmitting(true);
 
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-
-    const title = String(formData.get("title") || "").trim();
-    const location = String(formData.get("location") || "").trim();
-    const category = (String(formData.get("category") || "Misc").trim() ||
-      "Misc") as Category;
-    const date_found = String(formData.get("date_found") || "").trim();
-    const notes = String(formData.get("notes") || "").trim();
-    const file = formData.get("photo") as File | null;
-
-    if (!title) {
-      setErr("Please enter a title.");
-      setSubmitting(false);
-      return;
-    }
-    if (!date_found) {
-      setErr("Please select the date the item was found.");
-      setSubmitting(false);
-      return;
-    }
-
-    // Photo is REQUIRED
-    if (!file || file.size === 0) {
-      setErr("Please upload a photo of the item.");
-      setSubmitting(false);
-      return;
-    }
-
-    // Validate photo
-    const fileMb = file.size / (1024 * 1024);
-    if (fileMb > MAX_MB) {
-      setErr(`Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`);
-      setSubmitting(false);
-      return;
-    }
-    if (ALLOWED_MIME.length && file.type && !ALLOWED_MIME.includes(file.type)) {
-      setErr("Unsupported image type. Please upload JPG/PNG/WebP/HEIC.");
-      setSubmitting(false);
-      return;
-    }
-
-    // 1) Upload photo (required)
-    let photo_path: string | null = null;
     try {
+      const form = e.currentTarget;
+      const formData = new FormData(form);
+
+      const title = String(formData.get("title") || "").trim();
+      const location = String(formData.get("location") || "").trim();
+      const category = (String(formData.get("category") || "Misc").trim() ||
+        "Misc") as Category;
+      const date_found = String(formData.get("date_found") || "").trim();
+      const notes = String(formData.get("notes") || "").trim();
+      const file = formData.get("photo") as File | null;
+
+      if (!title) {
+        throw new Error("Please enter a title.");
+      }
+      if (!date_found) {
+        throw new Error("Please select the date the item was found.");
+      }
+      if (!file || file.size === 0) {
+        throw new Error("Please upload a photo of the item.");
+      }
+
+      const fileMb = file.size / (1024 * 1024);
+      if (fileMb > MAX_MB) {
+        throw new Error(
+          `Image is too large (${fileMb.toFixed(1)} MB). Max ${MAX_MB} MB.`,
+        );
+      }
+      if (
+        ALLOWED_MIME.length &&
+        file.type &&
+        !ALLOWED_MIME.includes(file.type)
+      ) {
+        throw new Error(
+          "Unsupported image type. Please upload JPG/PNG/WebP/HEIC.",
+        );
+      }
+
+      // 1) Upload photo
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `public/${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}.${ext}`;
+      const path = `public/${crypto.randomUUID()}.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from(BUCKET)
@@ -132,16 +126,11 @@ export default function ItemForm() {
           contentType: file.type || undefined,
         });
 
-      if (uploadErr) throw uploadErr;
-      photo_path = path;
-    } catch (e: any) {
-      setErr(`Photo upload failed: ${e?.message || e}`);
-      setSubmitting(false);
-      return;
-    }
+      if (uploadErr) {
+        throw new Error(`Photo upload failed: ${uploadErr.message}`);
+      }
 
-    // 2) Insert DB row
-    try {
+      // 2) Insert DB row
       const { error: insertErr } = await supabase.from("items").insert([
         {
           title,
@@ -149,19 +138,26 @@ export default function ItemForm() {
           category,
           date_found,
           status: "pending",
-          photo_url: photo_path,
+          photo_url: path,
           notes,
         },
       ]);
-      if (insertErr) throw insertErr;
-    } catch (e: any) {
-      setErr(`Could not save item: ${e?.message || e}`);
-      setSubmitting(false);
-      return;
-    }
 
-    // 3) Redirect
-    router.push("/?posted=1");
+      if (insertErr) {
+        throw new Error(`Could not save item: ${insertErr.message}`);
+      }
+
+      // Optional debug line
+      console.log("Item submitted successfully");
+
+      // 3) Navigate away
+      router.push("/?posted=1");
+    } catch (error: any) {
+      console.error("Submit failed:", error);
+      setErr(error?.message || "Something went wrong while submitting.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
