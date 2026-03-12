@@ -12,8 +12,9 @@ import { BUCKET, FALLBACK_THUMB } from "@/lib/admin/constants";
 import { useToasts } from "@/lib/admin/hooks/useToasts";
 import { Header } from "@/lib/admin/components";
 
-// Modals still from lib
+// Modals
 import { ChatModal } from "@/lib/admin/components/modals/ChatModal";
+import { ConfirmModal } from "@/lib/admin/components/modals/ConfirmModal";
 
 // RPC & selectors
 import {
@@ -31,7 +32,7 @@ import {
   type ItemStatusWidened,
 } from "@/lib/admin/selectors";
 
-/* ===== New extracted UI ===== */
+/* ===== Extracted UI ===== */
 import AdminTabs, { type AdminTab } from "@/components/admin/AdminTabs";
 import OverviewSection from "@/components/admin/OverviewSection";
 import QueuesSection from "@/components/admin/QueuesSection";
@@ -63,6 +64,12 @@ type AuditRow = {
   user_agent?: string | null;
 };
 
+type ConfirmState =
+  | { type: "reject-item"; item: Item }
+  | { type: "approve-claim"; claim: Claim }
+  | { type: "reject-claim"; claim: Claim }
+  | null;
+
 /* =========================================================
    Page
    ======================================================= */
@@ -84,20 +91,24 @@ export default function AdminPage() {
   const [editForm, setEditForm] = useState<EditItemForm>({});
   const [editSaving, setEditSaving] = useState(false);
 
-  // Approve confirm
+  // Approve item confirm
   const [approveOpen, setApproveOpen] = useState(false);
   const [approveBusy, setApproveBusy] = useState(false);
   const [approveTarget, setApproveTarget] = useState<Item | null>(null);
 
+  // Generic confirm modal
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   // Photo lightbox
   const [photoOpen, setPhotoOpen] = useState(false);
   const [photoTitle, setPhotoTitle] = useState("");
+  const [photoCategory, setPhotoCategory] = useState<string | undefined>();
+  const [photoLocation, setPhotoLocation] = useState<string | undefined>();
+  const [photoDescription, setPhotoDescription] = useState<
+    string | undefined
+  >();
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
-  function openPhotos(title: string, urls: string[]) {
-    setPhotoTitle(title);
-    setPhotoUrls(urls);
-    setPhotoOpen(true);
-  }
 
   // Schedule modal
   const [schedOpen, setSchedOpen] = useState(false);
@@ -128,48 +139,80 @@ export default function AdminPage() {
   // thumbnails cache: item.id -> public url
   const [thumbMap, setThumbMap] = useState<Record<number, string>>({});
 
+  function openPhotos({
+    title,
+    urls,
+    category,
+    location,
+    description,
+  }: {
+    title: string;
+    urls: string[];
+    category?: string;
+    location?: string;
+    description?: string;
+  }) {
+    setPhotoTitle(title);
+    setPhotoUrls(urls);
+    setPhotoCategory(category);
+    setPhotoLocation(location);
+    setPhotoDescription(description);
+    setPhotoOpen(true);
+  }
+
   /* ---------------- Auth + load ---------------- */
   const load = async () => {
     setLoading(true);
 
-    const { data: userRes } = await supabase.auth.getUser();
-    const uid = userRes.user?.id;
+    try {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
 
-    if (!uid) {
-      router.replace("/auth/login");
-      return;
+      const uid = userRes.user?.id;
+      if (!uid) {
+        router.replace("/auth/login");
+        return;
+      }
+
+      const { data: prof, error: profErr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("uid", uid)
+        .single();
+
+      if (profErr) throw profErr;
+
+      if (!prof || !["admin", "staff"].includes(prof.role)) {
+        alert("Not authorized");
+        router.replace("/");
+        return;
+      }
+
+      setRole(prof.role as "admin" | "staff");
+
+      const [{ data: its, error: itemsErr }, { data: cls, error: claimsErr }] =
+        await Promise.all([
+          supabase
+            .from("items")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("claims")
+            .select("*")
+            .order("created_at", { ascending: false }),
+        ]);
+
+      if (itemsErr) throw itemsErr;
+      if (claimsErr) throw claimsErr;
+
+      setItems((its as Item[]) || []);
+      setClaims((cls as Claim[]) || []);
+    } catch (err) {
+      console.error("Admin load failed:", err);
+    } finally {
+      setLoading(false);
     }
-
-    const { data: prof, error: profErr } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("uid", uid)
-      .single();
-
-    if (profErr || !prof || !["admin", "staff"].includes(prof.role)) {
-      alert("Not authorized");
-      router.replace("/");
-      return;
-    }
-
-    setRole(prof.role as "admin" | "staff");
-
-    const [{ data: its }, { data: cls }] = await Promise.all([
-      supabase
-        .from("items")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("claims")
-        .select("*")
-        .order("created_at", { ascending: false }),
-    ]);
-
-    setItems((its as Item[]) || []);
-    setClaims((cls as Claim[]) || []);
-    setLoading(false);
   };
-
   async function loadActivity({ reset = false }: { reset?: boolean } = {}) {
     setLogLoading(true);
 
@@ -201,7 +244,7 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    load();
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -219,7 +262,7 @@ export default function AdminPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "claims" },
-        () => load(),
+        () => void load(),
       )
       .subscribe();
 
@@ -247,7 +290,7 @@ export default function AdminPage() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(ch);
+      void supabase.removeChannel(ch);
     };
   }, [tab]);
 
@@ -337,7 +380,7 @@ export default function AdminPage() {
     await logEvent("item_updated", "item", editItem.id, payload as any);
   };
 
-  /* ---------------- Actions: ITEMS (moderation) ---------------- */
+  /* ---------------- Actions: ITEMS ---------------- */
   const askApprove = (it: Item) => {
     setApproveTarget(it);
     setApproveOpen(true);
@@ -389,10 +432,12 @@ export default function AdminPage() {
       .from("items")
       .update({ status })
       .eq("id", id);
+
     if (error) {
       addToast(`Error: ${error.message}`);
       return;
     }
+
     moveItemLocally(id, "rejected");
     addToast(`Item #${id} → rejected`);
     await logEvent("item_rejected", "item", id);
@@ -403,10 +448,12 @@ export default function AdminPage() {
       .from("items")
       .update({ status: "listed" })
       .eq("id", id);
+
     if (error) {
       addToast(`Error: ${error.message}`);
       return;
     }
+
     moveItemLocally(id, "listed");
     addToast(`Item #${id} restored to Listed.`);
     await logEvent("item_released_hold", "item", id);
@@ -428,13 +475,15 @@ export default function AdminPage() {
         try {
           await navigator.clipboard.writeText(info.pickup_code);
           addToast("Pickup code copied.");
-        } catch {}
+        } catch {
+          // ignore clipboard failures
+        }
       } else {
         addToast(`Claim #${c.id} approved.`);
       }
 
       await logEvent("approve_claim", "claim", c.id, { item_id: c.item_id });
-      load();
+      await load();
     } catch (e: any) {
       addToast(`Approve failed: ${e.message || e}`);
     }
@@ -446,11 +495,12 @@ export default function AdminPage() {
       addToast("Not signed in.");
       return;
     }
+
     try {
       await requestInfoRPC(c.id, uid, "");
       addToast(`Asked for more info on Claim #${c.id}`);
       await logEvent("request_info", "claim", c.id);
-      load();
+      await load();
     } catch (e: any) {
       addToast(`Request failed: ${e.message || e}`);
     }
@@ -462,11 +512,12 @@ export default function AdminPage() {
       addToast("Not signed in.");
       return;
     }
+
     try {
       await rejectClaimRPC(c.id, uid, "Not enough proof to verify ownership.");
       addToast(`Claim #${c.id} rejected.`);
       await logEvent("reject_claim", "claim", c.id);
-      load();
+      await load();
     } catch (e: any) {
       addToast(`Reject failed: ${e.message || e}`);
     }
@@ -490,7 +541,7 @@ export default function AdminPage() {
       addToast("Item marked returned.");
       await logEvent("mark_picked_up", "claim", null, { pickup_code: code });
       setPickupCode("");
-      load();
+      await load();
     } catch (e: any) {
       addToast(e.message ?? "Invalid or already used code.");
     } finally {
@@ -542,11 +593,44 @@ export default function AdminPage() {
       addToast("Item marked as picked up!");
       await logEvent("mark_picked_up", "claim", null, { pickup_code: code });
       setPickupCode("");
-      load();
+      await load();
     } catch (err: any) {
       addToast(err?.message ?? "Failed to mark as picked up");
     } finally {
       setMarkBusy(false);
+    }
+  }
+
+  /* ---------------- Confirm helpers ---------------- */
+  function askRejectItem(it: Item) {
+    setConfirmState({ type: "reject-item", item: it });
+  }
+
+  function askApproveClaim(c: Claim) {
+    setConfirmState({ type: "approve-claim", claim: c });
+  }
+
+  function askRejectClaim(c: Claim) {
+    setConfirmState({ type: "reject-claim", claim: c });
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmState || confirmBusy) return;
+
+    setConfirmBusy(true);
+
+    try {
+      if (confirmState.type === "reject-item") {
+        await updateItemStatus(confirmState.item.id, "rejected");
+      } else if (confirmState.type === "approve-claim") {
+        await onApproveClaim(confirmState.claim);
+      } else if (confirmState.type === "reject-claim") {
+        await onRejectClaim(confirmState.claim);
+      }
+
+      setConfirmState(null);
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -598,7 +682,7 @@ export default function AdminPage() {
 
     setSchedOpen(false);
     setSchedClaim(null);
-    load();
+    await load();
   }
 
   /* ---------------- Derived ---------------- */
@@ -663,6 +747,7 @@ export default function AdminPage() {
 
         {tab === "Overview" && (
           <OverviewSection
+            items={items}
             totalItems={totalItems}
             totalClaims={totalClaims}
             listedCount={listedCount}
@@ -680,13 +765,13 @@ export default function AdminPage() {
             onViewAllQueues={() => setTab("Queues")}
             onOpenActivityTab={() => setTab("Activity")}
             onAskApproveItem={askApprove}
-            onRejectItem={(id) => updateItemStatus(id, "rejected")}
+            onAskRejectItem={askRejectItem}
             onEditItem={openEdit}
             onOpenPhotos={openPhotos}
             onOpenChat={openChat}
             onOpenSchedule={openSchedule}
-            onApproveClaim={onApproveClaim}
-            onRejectClaim={onRejectClaim}
+            onAskApproveClaim={askApproveClaim}
+            onAskRejectClaim={askRejectClaim}
           />
         )}
 
@@ -732,6 +817,9 @@ export default function AdminPage() {
       <PhotoLightboxModal
         open={photoOpen}
         title={photoTitle}
+        category={photoCategory}
+        location={photoLocation}
+        description={photoDescription}
         urls={photoUrls}
         onClose={() => setPhotoOpen(false)}
       />
@@ -753,6 +841,52 @@ export default function AdminPage() {
         onCancel={() => setApproveOpen(false)}
         onConfirm={confirmApprove}
       />
+
+      <ConfirmModal
+        open={!!confirmState}
+        busy={confirmBusy}
+        title={
+          confirmState?.type === "reject-item"
+            ? "Reject item?"
+            : confirmState?.type === "approve-claim"
+              ? "Approve claim?"
+              : confirmState?.type === "reject-claim"
+                ? "Reject claim?"
+                : "Confirm action"
+        }
+        confirmLabel={
+          confirmState?.type === "approve-claim" ? "Approve" : "Reject"
+        }
+        cancelLabel="Cancel"
+        onCancel={() => {
+          if (!confirmBusy) setConfirmState(null);
+        }}
+        onConfirm={handleConfirmAction}
+      >
+        {confirmState?.type === "reject-item" && (
+          <>
+            Are you sure you want to reject{" "}
+            <span className="font-semibold">
+              #{confirmState.item.id} · {confirmState.item.title}
+            </span>
+            ?
+          </>
+        )}
+
+        {confirmState?.type === "approve-claim" && (
+          <>
+            Are you sure you want to approve claim{" "}
+            <span className="font-semibold">#{confirmState.claim.id}</span>?
+          </>
+        )}
+
+        {confirmState?.type === "reject-claim" && (
+          <>
+            Are you sure you want to reject claim{" "}
+            <span className="font-semibold">#{confirmState.claim.id}</span>?
+          </>
+        )}
+      </ConfirmModal>
 
       {chatOpen && chatClaim && (
         <ChatModal

@@ -139,3 +139,46 @@ a {
   white-space: nowrap;
   border: 0;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.22s ease-out;
+}
+
+.animate-messageIn {
+  animation: messageIn 0.16s ease-out;
+}

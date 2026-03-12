@@ -105,12 +105,13 @@ export function Header() {
     window.addEventListener("mousedown", onClick);
     return () => window.removeEventListener("mousedown", onClick);
   }, [mobileOpen]);
-
   // Auth load + listener
   useEffect(() => {
-    const loadAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      const u = data.session?.user ?? null;
+    let alive = true;
+
+    async function applySessionUser(u: any) {
+      if (!alive) return;
+
       setAuth(u ? "authed" : "guest");
       setUserEmail(u?.email ?? null);
 
@@ -119,45 +120,72 @@ export function Header() {
         return;
       }
 
-      // fetch role from profiles
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("uid", u.id)
-        .single();
-
-      setRole((prof?.role as ProfileRole) ?? "user");
-    };
-
-    loadAuth();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (_evt, session) => {
-        const u = session?.user ?? null;
-        setAuth(u ? "authed" : "guest");
-        setUserEmail(u?.email ?? null);
-
-        if (!u) {
-          setRole(null);
-          return;
-        }
-
-        // close panel on successful auth
-        closePanel();
-
-        // refresh role
-        const { data: prof } = await supabase
+      try {
+        const { data: prof, error: profErr } = await supabase
           .from("profiles")
           .select("role")
           .eq("uid", u.id)
           .single();
 
+        if (!alive) return;
+
+        if (profErr) {
+          console.error("Header profile fetch failed:", profErr);
+          setRole("user");
+          return;
+        }
+
         setRole((prof?.role as ProfileRole) ?? "user");
+      } catch (err) {
+        if (!alive) return;
+        console.error("Header profile fetch crashed:", err);
+        setRole("user");
+      }
+    }
+
+    async function bootstrap() {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (!alive) return;
+
+        if (error) {
+          console.error("Header auth bootstrap failed:", error);
+          setAuth("guest");
+          setUserEmail(null);
+          setRole(null);
+          return;
+        }
+
+        await applySessionUser(data.session?.user ?? null);
+      } catch (err) {
+        if (!alive) return;
+        console.error("Header auth bootstrap crashed:", err);
+        setAuth("guest");
+        setUserEmail(null);
+        setRole(null);
+      }
+    }
+
+    void bootstrap();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (_evt, session) => {
+        if (!alive) return;
+
+        await applySessionUser(session?.user ?? null);
+
+        if (session?.user) {
+          closePanel();
+        }
       },
     );
 
-    return () => sub.subscription.unsubscribe();
-  }, [closePanel]);
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   // Click outside login panel
   useEffect(() => {
@@ -174,10 +202,13 @@ export function Header() {
 
   // ✅ Guarded navigation: if guest -> open login panel and remember target
   function guardedGo(targetHref: string) {
+    if (auth === "loading") return;
+
     if (auth === "authed") {
       router.push(targetHref);
       return;
     }
+
     openPanel(targetHref);
   }
 
@@ -199,8 +230,8 @@ export function Header() {
     }
 
     // ✅ Fetch role immediately after login
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user?.id;
 
     if (uid) {
       const { data: prof } = await supabase
