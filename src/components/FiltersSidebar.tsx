@@ -2,7 +2,7 @@
 "use client";
 
 import { uniqueLabels, normalize } from "@/utils/unique";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { BASE } from "@/lib/basePath";
@@ -25,7 +25,7 @@ const CATEGORY_OPTIONS = [
 
 export type FiltersInitial = {
   q?: string;
-  category?: string[]; // multi
+  category?: string[];
   location?: string;
   date_from?: string;
   date_to?: string;
@@ -36,12 +36,10 @@ type Props = { initial: FiltersInitial };
 
 export function FiltersSidebar({ initial }: Props) {
   const router = useRouter();
-  const sp = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Ensure category state starts de-duped
   const [cats, setCats] = useState<string[]>(
-    uniqueLabels((initial.category ?? []).filter(Boolean))
+    uniqueLabels((initial.category ?? []).filter(Boolean)),
   );
 
   const catsUnique = useMemo(() => uniqueLabels(cats), [cats]);
@@ -57,81 +55,75 @@ export function FiltersSidebar({ initial }: Props) {
     );
   }, [initial, catsUnique]);
 
-  // Build a URL from the current form values + provided categories (source of truth)
   const buildUrl = useCallback(
     (form: HTMLFormElement, categories: string[]) => {
       const fd = new FormData(form);
       const params = new URLSearchParams();
 
-      // Copy all current fields except category (we'll re-append)
       for (const [k, v] of fd.entries()) {
         if (!v) continue;
         if (k === "category") continue;
         params.set(k, String(v));
       }
 
-      // Append categories from state (de-duped)
       uniqueLabels(categories).forEach((c) => params.append("category", c));
 
       const qs = params.toString();
       return qs ? `/search?${qs}` : "/search";
     },
-    []
+    [],
   );
 
-  // Update instantly on change for non-category fields
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLFormElement>) => {
       const form = e.currentTarget;
       router.replace(buildUrl(form, catsUnique));
     },
-    [router, buildUrl, catsUnique]
+    [router, buildUrl, catsUnique],
   );
 
-  // Toggle a category (normalize for compare; preserve label casing)
-  const toggleCat = (label: string) => {
-    const slug = normalize(label);
-    setCats((prev) => {
-      // Map by normalized label to avoid dupes like Bottle/bottle
-      const bySlug = new Map(prev.map((l) => [normalize(l), l]));
+  const toggleCat = useCallback(
+    (label: string) => {
+      const slug = normalize(label);
+
+      const bySlug = new Map(catsUnique.map((l) => [normalize(l), l]));
       if (bySlug.has(slug)) bySlug.delete(slug);
       else bySlug.set(slug, label.trim());
 
       const next = Array.from(bySlug.values());
+      setCats(next);
 
-      // Reflect in URL immediately
       const form = formRef.current;
       if (form) {
         router.replace(buildUrl(form, next));
       }
-      return next;
-    });
-  };
+    },
+    [catsUnique, router, buildUrl],
+  );
 
-  const clearAll = () => {
+  const clearAll = useCallback(() => {
     setCats([]);
     const form = formRef.current;
     if (form) {
       form.reset();
-      router.replace("/search");
     }
-  };
+    router.replace("/search");
+  }, [router]);
 
   /* ----- PaperGrid background ----- */
   const dot = encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`
+    `<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><circle cx='1' cy='1' r='1' fill='${CREEK_NAVY}22'/></svg>`,
   );
 
   return (
-    <aside className="w-full md:w-64 md:sticky md:top-16 self-start">
+    <aside className="self-start w-full md:sticky md:top-16 md:w-64">
       <div
-        className="rounded-3xl p-5 shadow-[0_10px_30px_rgba(0,0,0,.05)] bg-white dark:bg-gray-900"
+        className="rounded-3xl bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,.05)] dark:bg-gray-900"
         style={{
           backgroundImage: `url("data:image/svg+xml,${dot}")`,
           backgroundColor: "#fafbff",
         }}
       >
-        {/* Header with shield + Reset */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg width="22" height="26" viewBox="0 0 24 28" aria-hidden>
@@ -156,6 +148,7 @@ export function FiltersSidebar({ initial }: Props) {
               Filters
             </h2>
           </div>
+
           {isActive && (
             <button
               type="button"
@@ -168,7 +161,6 @@ export function FiltersSidebar({ initial }: Props) {
           )}
         </div>
 
-        {/* Form */}
         <form
           ref={formRef}
           action={BASE ? `${BASE}/search` : "/search"}
@@ -176,40 +168,40 @@ export function FiltersSidebar({ initial }: Props) {
           className="space-y-5"
           onChange={onChange}
         >
-          {/* Preserve q in a hidden field so typing elsewhere keeps it */}
           {initial.q && (
             <input type="hidden" name="q" defaultValue={initial.q} />
           )}
 
-          {/* Hidden inputs mirror de-duped category state */}
           {catsUnique.map((c) => (
             <input
               key={`cat-${normalize(c)}`}
               type="hidden"
               name="category"
               value={c}
+              readOnly
             />
           ))}
 
-          {/* Category chips */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-4">
+          <div className="border-b border-gray-200 pb-4 dark:border-gray-800">
             <p
               className="mb-2 text-sm font-medium"
               style={{ color: CREEK_NAVY }}
             >
               Category
             </p>
+
             <div className="flex flex-wrap gap-2">
               {CATEGORY_OPTIONS.map((c) => {
                 const active = catsUnique.some(
-                  (x) => normalize(x) === normalize(c)
+                  (x) => normalize(x) === normalize(c),
                 );
+
                 return (
                   <button
                     key={`chip-${normalize(c)}`}
                     type="button"
                     onClick={() => toggleCat(c)}
-                    className={`rounded-full px-3 py-1.5 text-sm transition shadow-sm ring-1 ${
+                    className={`rounded-full px-3 py-1.5 text-sm shadow-sm ring-1 transition ${
                       active
                         ? "text-white"
                         : "bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-200"
@@ -227,8 +219,7 @@ export function FiltersSidebar({ initial }: Props) {
             </div>
           </div>
 
-          {/* Location */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-4">
+          <div className="border-b border-gray-200 pb-4 dark:border-gray-800">
             <label
               htmlFor="location"
               className="mb-1 block text-sm font-medium"
@@ -236,15 +227,14 @@ export function FiltersSidebar({ initial }: Props) {
             >
               Location
             </label>
+
             <div className="relative">
               <input
                 id="location"
                 name="location"
                 placeholder="e.g., Gym, Library"
                 defaultValue={initial.location ?? ""}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 
-                           px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 
-                           focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-[rgba(11,44,92,1)] focus:ring-2 focus:ring-[rgba(11,44,92,0.6)] dark:border-gray-700 dark:bg-gray-900"
               />
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
                 ⌕
@@ -252,39 +242,35 @@ export function FiltersSidebar({ initial }: Props) {
             </div>
           </div>
 
-          {/* Date range */}
-          <div className="border-b border-gray-200 dark:border-gray-800 pb-4">
+          <div className="border-b border-gray-200 pb-4 dark:border-gray-800">
             <p
               className="mb-2 text-sm font-medium"
               style={{ color: CREEK_NAVY }}
             >
               Date range
             </p>
+
             <div className="flex gap-2">
               <div className="min-w-0 flex-1">
                 <input
                   type="date"
                   name="date_from"
                   defaultValue={initial.date_from ?? ""}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 
-                             px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 
-                             focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-[rgba(11,44,92,1)] focus:ring-2 focus:ring-[rgba(11,44,92,0.6)] dark:border-gray-700 dark:bg-gray-900"
                 />
               </div>
+
               <div className="min-w-0 flex-1">
                 <input
                   type="date"
                   name="date_to"
                   defaultValue={initial.date_to ?? ""}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 
-                              px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 
-                              focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-[rgba(11,44,92,1)] focus:ring-2 focus:ring-[rgba(11,44,92,0.6)] dark:border-gray-700 dark:bg-gray-900"
                 />
               </div>
             </div>
           </div>
 
-          {/* Sort */}
           <div>
             <label
               htmlFor="sort"
@@ -293,20 +279,18 @@ export function FiltersSidebar({ initial }: Props) {
             >
               Sort by
             </label>
+
             <select
               id="sort"
               name="sort"
               defaultValue={initial.sort ?? "newest"}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 
-                         px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 
-                         focus:ring-[rgba(11,44,92,0.6)] focus:border-[rgba(11,44,92,1)]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-[rgba(11,44,92,1)] focus:ring-2 focus:ring-[rgba(11,44,92,0.6)] dark:border-gray-700 dark:bg-gray-900"
             >
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
             </select>
           </div>
 
-          {/* Apply / Reset buttons */}
           <div className="flex items-center gap-2">
             <button
               type="submit"
@@ -315,6 +299,7 @@ export function FiltersSidebar({ initial }: Props) {
             >
               Apply
             </button>
+
             <button
               type="button"
               onClick={clearAll}

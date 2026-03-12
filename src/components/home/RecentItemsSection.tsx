@@ -1,6 +1,7 @@
 // src/components/home/RecentItemsSection.tsx
 "use client";
 
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { ItemCard } from "@/components/ItemCard";
 
 export type RecentCardItem = {
@@ -15,15 +16,62 @@ export type RecentCardItem = {
 type RecentItemsSectionProps = {
   authLoading: boolean;
   isAuthed: boolean;
-
   items: RecentCardItem[];
-
   creekRed: string;
   creekNavy: string;
-
   onSignIn: () => void;
   onViewAll: () => void;
   onReport: () => void;
+};
+
+/* ---------- Motion ---------- */
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.28,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const staggerWrap: Variants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.04,
+    },
+  },
+};
+
+const cardMotion: Variants = {
+  hidden: { opacity: 0, y: 18, scale: 0.985 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.22,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const popIn: Variants = {
+  hidden: { opacity: 0, scale: 0.94, y: 12 },
+  show: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.24,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
 };
 
 export function RecentItemsSection({
@@ -37,51 +85,104 @@ export function RecentItemsSection({
   onReport,
 }: RecentItemsSectionProps) {
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      {authLoading ? (
-        <section className="rounded-2xl border border-dashed border-gray-300 py-12 text-center">
-          <p className="text-sm text-gray-600">Loading…</p>
-        </section>
-      ) : !isAuthed ? (
-        <LoginGateCard
-          creekRed={creekRed}
-          creekNavy={creekNavy}
-          onSignIn={onSignIn}
-          onReport={onReport}
-        />
-      ) : items.length > 0 ? (
-        <>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: creekNavy }}>
-              Recently Reported
-            </h2>
-
-            <button
-              type="button"
-              onClick={onViewAll}
-              className="text-sm underline"
-              style={{ color: creekRed }}
+    <motion.main
+      className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+      initial="hidden"
+      animate="show"
+      variants={fadeUp}
+    >
+      <AnimatePresence mode="wait">
+        {authLoading ? (
+          <motion.section
+            key="loading"
+            className="rounded-2xl border border-dashed border-gray-300 py-12 text-center"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <p className="text-sm text-gray-600">Loading…</p>
+          </motion.section>
+        ) : !isAuthed ? (
+          <motion.div
+            key="gate"
+            initial={{ opacity: 0, y: 16, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <LoginGateCard
+              creekRed={creekRed}
+              creekNavy={creekNavy}
+              onSignIn={onSignIn}
+              onReport={onReport}
+            />
+          </motion.div>
+        ) : items.length > 0 ? (
+          <motion.div
+            key="items"
+            initial="hidden"
+            animate="show"
+            exit="hidden"
+            variants={staggerWrap}
+          >
+            <motion.div
+              variants={fadeUp}
+              className="mb-4 flex items-center justify-between"
             >
-              View all
-            </button>
-          </div>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: creekNavy }}
+              >
+                Recently Reported
+              </h2>
 
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((it) => (
-              <li key={it.id}>
-                <ItemCard item={it as any} />
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <EmptyState creekRed={creekRed} onReport={onReport} />
-      )}
-    </main>
+              <motion.button
+                type="button"
+                onClick={onViewAll}
+                className="text-sm underline"
+                style={{ color: creekRed }}
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                View all
+              </motion.button>
+            </motion.div>
+
+            <motion.ul
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              variants={staggerWrap}
+            >
+              {items.map((it) => (
+                <motion.li
+                  key={it.id}
+                  variants={cardMotion}
+                  layout
+                  whileHover={{ y: -4 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <ItemCard item={it as any} />
+                </motion.li>
+              ))}
+            </motion.ul>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0, y: 14, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <EmptyState creekRed={creekRed} onReport={onReport} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.main>
   );
 }
 
-/* ---------- Logged-out CTA (Option 2) ---------- */
+/* ---------- Logged-out CTA ---------- */
 
 function LoginGateCard({
   creekRed,
@@ -96,37 +197,55 @@ function LoginGateCard({
 }) {
   return (
     <section className="relative overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-white py-16">
-      {/* subtle background pattern */}
-      <div
+      <motion.div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
         style={{
           backgroundImage:
             "radial-gradient(circle at 1px 1px, rgba(11,44,92,0.12) 1px, transparent 0)",
           backgroundSize: "22px 22px",
         }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.35 }}
+        transition={{ duration: 0.35 }}
       />
 
-      <div className="relative mx-auto flex max-w-xl flex-col items-center px-6 text-center">
-        {/* icon badge */}
-        <div
+      <motion.div
+        className="relative mx-auto flex max-w-xl flex-col items-center px-6 text-center"
+        initial="hidden"
+        animate="show"
+        variants={staggerWrap}
+      >
+        <motion.div
+          variants={popIn}
           className="mb-4 grid h-14 w-14 place-items-center rounded-2xl border bg-white shadow-sm"
           style={{ borderColor: "rgba(11,44,92,0.18)" }}
           aria-hidden="true"
+          whileHover={{ y: -2, rotate: -3 }}
         >
           <span className="text-2xl">🎒</span>
-        </div>
+        </motion.div>
 
-        <p className="text-2xl font-semibold" style={{ color: creekNavy }}>
+        <motion.p
+          variants={fadeUp}
+          className="text-2xl font-semibold"
+          style={{ color: creekNavy }}
+        >
           Looking for something you lost?
-        </p>
+        </motion.p>
 
-        <p className="mt-2 text-sm leading-6 text-gray-600">
+        <motion.p
+          variants={fadeUp}
+          className="mt-2 text-sm leading-6 text-gray-600"
+        >
           Sign in to see recently reported items and check if your item has been
           found.
-        </p>
+        </motion.p>
 
-        <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row">
-          <button
+        <motion.div
+          variants={fadeUp}
+          className="mt-6 flex flex-col items-center gap-3 sm:flex-row"
+        >
+          <motion.button
             type="button"
             onClick={onSignIn}
             className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
@@ -134,11 +253,13 @@ function LoginGateCard({
               backgroundColor: creekRed,
               boxShadow: "0 8px 20px rgba(191,30,46,0.22)",
             }}
+            whileHover={{ y: -1, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             Sign in
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
             type="button"
             onClick={onReport}
             className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2"
@@ -147,20 +268,22 @@ function LoginGateCard({
               border: "1px solid rgba(11,44,92,0.25)",
               background: "white",
             }}
+            whileHover={{ y: -1, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             Report an item
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
-        <p className="mt-5 text-xs text-gray-500">
+        <motion.p variants={fadeUp} className="mt-5 text-xs text-gray-500">
           We limit the list to signed-in users to help protect student privacy.
-        </p>
-      </div>
+        </motion.p>
+      </motion.div>
     </section>
   );
 }
 
-/* ---------- Empty state (logged in, no items) ---------- */
+/* ---------- Empty state ---------- */
 
 function EmptyState({
   creekRed,
@@ -171,21 +294,39 @@ function EmptyState({
 }) {
   return (
     <section className="grid place-items-center rounded-2xl border border-dashed border-gray-300 py-16">
-      <div className="text-center">
-        <p className="text-lg font-medium">No items yet</p>
-        <p className="mt-1 text-sm text-gray-600">
-          Be the first to add a found item so we can get it back to its owner.
-        </p>
+      <motion.div
+        className="text-center"
+        initial="hidden"
+        animate="show"
+        variants={staggerWrap}
+      >
+        <motion.div
+          variants={popIn}
+          className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 bg-white text-xl shadow-sm"
+        >
+          📭
+        </motion.div>
 
-        <button
+        <motion.p variants={fadeUp} className="text-lg font-medium">
+          No items yet
+        </motion.p>
+
+        <motion.p variants={fadeUp} className="mt-1 text-sm text-gray-600">
+          Be the first to add a found item so we can get it back to its owner.
+        </motion.p>
+
+        <motion.button
           type="button"
           onClick={onReport}
           className="mt-4 inline-block rounded-lg px-4 py-2 text-white"
           style={{ backgroundColor: creekRed }}
+          variants={fadeUp}
+          whileHover={{ y: -1, scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
         >
           Report an Item
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
     </section>
   );
 }
