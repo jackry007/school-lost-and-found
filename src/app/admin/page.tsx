@@ -165,10 +165,12 @@ export default function AdminPage() {
     setLoading(true);
 
     try {
-      const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw userErr;
+      const { data: sessionRes, error: sessionErr } =
+        await supabase.auth.getSession();
 
-      const uid = userRes.user?.id;
+      if (sessionErr) throw sessionErr;
+
+      const uid = sessionRes.session?.user?.id;
       if (!uid) {
         router.replace("/auth/login");
         return;

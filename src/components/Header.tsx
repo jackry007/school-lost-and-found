@@ -201,16 +201,21 @@ export function Header() {
   }, [panelOpen, closePanel]);
 
   // ✅ Guarded navigation: if guest -> open login panel and remember target
-  function guardedGo(targetHref: string) {
-    if (auth === "loading") return;
+function guardedGo(targetHref: string) {
+  if (auth === "loading") return;
 
-    if (auth === "authed") {
-      router.push(targetHref);
-      return;
-    }
-
-    openPanel(targetHref);
+  if (auth === "authed") {
+    router.push(targetHref);
+    return;
   }
+
+  if (targetHref === "/admin") {
+    router.push("/auth/login?next=/admin");
+    return;
+  }
+
+  openPanel(targetHref);
+}
 
   // Handle login
   async function handleLogin(e: React.FormEvent) {
@@ -268,7 +273,7 @@ export function Header() {
     () => [
       { href: "/", label: "Lost & Found", guard: false },
       { href: "/report", label: "Report Found Item", guard: true },
-      { href: "/admin", label: "Admin", guard: false },
+      { href: "/admin", label: "Admin", guard: true },
     ],
     [],
   );
