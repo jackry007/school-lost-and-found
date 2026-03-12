@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/lib/supabaseClient";
 import ChatModal, { type ChatClaim } from "./ChatModal";
 
@@ -21,7 +22,6 @@ type ClaimMessage = {
 const CREEK_RED = "#BF1E2E";
 const CREEK_NAVY = "#0B2C5C";
 const CREEK_BLUE_SOFT = "#EAF1FB";
-const CREEK_RED_SOFT = "#FCECEE";
 
 /* ---------- UI helpers ---------- */
 function initialsFrom(name?: string | null, email?: string | null) {
@@ -470,12 +470,15 @@ export default function MessagesPortal() {
 
       <div className="relative">
         {/* Launcher */}
-        <button
+        <motion.button
           ref={launcherRef}
           onClick={() => {
             setOpen((o) => !o);
             setActiveIndex(-1);
           }}
+          whileHover={{ y: -1, scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.16 }}
           className={[
             "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
             "border border-white/30 bg-white/10 text-white transition hover:bg-white/20",
@@ -483,276 +486,382 @@ export default function MessagesPortal() {
           ].join(" ")}
           title="Messages"
         >
-          Messages
-          {totalUnread > 0 && (
-            <span
-              className="ml-1 inline-flex min-w-[1.35rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold text-white shadow-sm"
-              style={{ backgroundColor: CREEK_RED }}
-            >
-              {totalUnread}
-            </span>
-          )}
-        </button>
+          <span>Messages</span>
 
-        {open && (
-          <div
-            ref={portalRef}
-            className="messages-portal fixed right-4 top-16 z-[70] w-[460px] max-w-[94vw] overflow-hidden rounded-[30px] border border-slate-200/90 bg-white shadow-[0_28px_90px_rgba(11,44,92,0.24)] flex flex-col"
-            style={{
-              maxHeight: "min(820px, calc(100vh - 96px))",
-            }}
-          >
-            {/* Header */}
-            <div
-              className="relative shrink-0 overflow-hidden border-b border-slate-200 px-5 py-4 text-white"
+          <AnimatePresence>
+            {totalUnread > 0 && (
+              <motion.span
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.6, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 420, damping: 24 }}
+                className="ml-1 inline-flex min-w-[1.35rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold text-white shadow-sm"
+                style={{ backgroundColor: CREEK_RED }}
+              >
+                {totalUnread}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              ref={portalRef}
+              initial={{ opacity: 0, y: 10, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.985 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="messages-portal fixed right-4 top-16 z-[70] flex max-w-[94vw] flex-col overflow-hidden rounded-[30px] border border-slate-200/90 bg-white shadow-[0_28px_90px_rgba(11,44,92,0.24)]"
               style={{
-                background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 72%)`,
+                width: 460,
+                maxHeight: "min(820px, calc(100vh - 96px))",
+                transformOrigin: "top right",
               }}
             >
-              <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
-              <div className="absolute -left-6 bottom-0 h-16 w-16 rounded-full bg-white/10 blur-xl" />
+              {/* Header */}
+              <div
+                className="relative shrink-0 overflow-hidden border-b border-slate-200 px-5 py-4 text-white"
+                style={{
+                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 72%)`,
+                }}
+              >
+                <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+                <div className="absolute -left-6 bottom-0 h-16 w-16 rounded-full bg-white/10 blur-xl" />
 
-              <div className="relative flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/12 text-base shadow-sm backdrop-blur">
-                      💬
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate text-base font-semibold tracking-tight">
-                          Messages
-                        </h3>
-                        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white/95">
-                          {threads.length}
-                        </span>
+                <div className="relative flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <motion.div
+                        initial={{ rotate: -8, opacity: 0, scale: 0.8 }}
+                        animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.22, delay: 0.04 }}
+                        className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/20 bg-white/12 text-base shadow-sm backdrop-blur"
+                      >
+                        💬
+                      </motion.div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate text-base font-semibold tracking-tight">
+                            Messages
+                          </h3>
+                          <motion.span
+                            key={threads.length}
+                            initial={{ scale: 0.85, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.18 }}
+                            className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white/95"
+                          >
+                            {threads.length}
+                          </motion.span>
+                        </div>
+                        <p className="truncate text-xs text-white/80">
+                          Cherry Creek Lost & Found inbox
+                        </p>
                       </div>
-                      <p className="truncate text-xs text-white/80">
-                        Cherry Creek Lost & Found inbox
-                      </p>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  onClick={() => setOpen(false)}
-                  className="shrink-0 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/20"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            {/* Toolbar */}
-            <div className="shrink-0 space-y-3 border-b border-slate-200 bg-white px-4 py-4">
-              <div className="relative">
-                <input
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-100"
-                  placeholder="Search by name, email, claim ID, or status..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {(["all", "pending", "approved", "rejected"] as const).map(
-                  (k) => {
-                    const active = statusFilter === k;
-                    return (
-                      <button
-                        key={k}
-                        onClick={() => setStatusFilter(k)}
-                        className={[
-                          "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
-                          active
-                            ? "border-transparent text-white shadow-sm"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                        ].join(" ")}
-                        style={
-                          active
-                            ? {
-                                background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
-                              }
-                            : undefined
-                        }
-                      >
-                        {k[0].toUpperCase() + k.slice(1)}
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300"
-                    checked={showUnreadOnly}
-                    onChange={(e) => setShowUnreadOnly(e.target.checked)}
-                  />
-                  Unread only
-                </label>
-
-                <select
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
-                  value={sort}
-                  onChange={(e) =>
-                    setSort(e.target.value as "new" | "old" | "unread")
-                  }
-                >
-                  <option value="new">Newest activity</option>
-                  <option value="old">Oldest activity</option>
-                  <option value="unread">Unread first</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Thread list */}
-            <div className="portal-scroll min-h-0 flex-1 overflow-auto bg-slate-50/60">
-              {!filteredThreads.length && (
-                <div className="px-6 py-12 text-center">
-                  <div
-                    className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border"
-                    style={{
-                      background: CREEK_BLUE_SOFT,
-                      borderColor: "#D7E3F7",
-                      color: CREEK_NAVY,
-                    }}
+                  <motion.button
+                    onClick={() => setOpen(false)}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="shrink-0 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm font-medium text-white backdrop-blur transition hover:bg-white/20"
                   >
-                    💬
-                  </div>
-                  <div className="text-sm font-semibold text-slate-800">
-                    No conversations found
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    Try changing your search or filters.
-                  </div>
+                    Close
+                  </motion.button>
                 </div>
-              )}
-
-              <ul ref={listRef} className="p-2">
-                {filteredThreads.map((c, i) => {
-                  const cid = Number(c.id);
-                  const preview = lastByClaim[cid] || "No messages yet";
-                  const unread = unreadByClaim[cid] || 0;
-                  const who = meIsStaff
-                    ? c.claimant_name || c.claimant_email || "Student"
-                    : `Staff • Claim #${cid}`;
-                  const initials = initialsFrom(
-                    c.claimant_name,
-                    c.claimant_email,
-                  );
-                  const lastAt = lastTimeByClaim[cid] || c.created_at || "";
-                  const isActive = i === activeIndex;
-
-                  return (
-                    <li key={cid} className="mb-2 last:mb-0">
-                      <button
-                        onClick={() => openThread(c)}
-                        className={[
-                          "group flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition",
-                          isActive
-                            ? "border-slate-300 bg-white ring-2 ring-slate-100"
-                            : "border-transparent bg-white hover:border-slate-200 hover:bg-white hover:shadow-[0_8px_24px_rgba(11,44,92,0.08)]",
-                        ].join(" ")}
-                      >
-                        <div className="relative mt-0.5 shrink-0">
-                          <div className="avatar flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 text-[13px] font-semibold text-slate-700">
-                            {initials}
-                          </div>
-                          {unread > 0 && (
-                            <span
-                              className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white shadow-sm"
-                              style={{ backgroundColor: CREEK_RED }}
-                            >
-                              {unread}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="min-w-0 grow">
-                          <div className="flex items-start gap-2">
-                            <div className="min-w-0 grow">
-                              <div className="flex items-center gap-2">
-                                <div className="truncate text-[14px] font-semibold text-slate-900">
-                                  {who}
-                                </div>
-
-                                {meIsStaff && (
-                                  <span
-                                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusPillClasses(
-                                      c.status,
-                                    )}`}
-                                  >
-                                    {c.status || "—"}
-                                  </span>
-                                )}
-                              </div>
-
-                              {meIsStaff && c.claimant_email && (
-                                <div className="mt-0.5 truncate text-[12px] text-slate-500">
-                                  {c.claimant_email}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="shrink-0 text-right">
-                              <div className="text-[11px] font-medium text-slate-500">
-                                {timeAgo(lastAt)}
-                              </div>
-                              <div className="mt-1">
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                  #{cid}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-2 flex items-start gap-2">
-                            {unread > 0 ? (
-                              <span
-                                className="mt-[2px] inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                                style={{ backgroundColor: CREEK_RED }}
-                                aria-hidden="true"
-                              />
-                            ) : (
-                              <span
-                                className="mt-[2px] inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-slate-200"
-                                aria-hidden="true"
-                              />
-                            )}
-
-                            <p
-                              className={`truncate text-[12.5px] ${
-                                unread > 0
-                                  ? "font-medium text-slate-800"
-                                  : "text-slate-600"
-                              }`}
-                            >
-                              {preview}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-slate-200 bg-white px-4 py-3">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>
-                  {filteredThreads.length} conversation
-                  {filteredThreads.length === 1 ? "" : "s"}
-                </span>
-                <span>{totalUnread} unread</span>
               </div>
-            </div>
-          </div>
-        )}
+
+              {/* Toolbar */}
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, delay: 0.04 }}
+                className="shrink-0 space-y-3 border-b border-slate-200 bg-white px-4 py-4"
+              >
+                <div className="relative">
+                  <input
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-100"
+                    placeholder="Search by name, email, claim ID, or status..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {(["all", "pending", "approved", "rejected"] as const).map(
+                    (k) => {
+                      const active = statusFilter === k;
+                      return (
+                        <motion.button
+                          key={k}
+                          onClick={() => setStatusFilter(k)}
+                          whileHover={{ y: -1 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={[
+                            "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+                            active
+                              ? "border-transparent text-white shadow-sm"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                          ].join(" ")}
+                          style={
+                            active
+                              ? {
+                                  background: `linear-gradient(135deg, ${CREEK_RED} 0%, ${CREEK_NAVY} 100%)`,
+                                }
+                              : undefined
+                          }
+                        >
+                          {k[0].toUpperCase() + k.slice(1)}
+                        </motion.button>
+                      );
+                    },
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <motion.label
+                    whileHover={{ y: -1 }}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300"
+                      checked={showUnreadOnly}
+                      onChange={(e) => setShowUnreadOnly(e.target.checked)}
+                    />
+                    Unread only
+                  </motion.label>
+
+                  <select
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-100"
+                    value={sort}
+                    onChange={(e) =>
+                      setSort(e.target.value as "new" | "old" | "unread")
+                    }
+                  >
+                    <option value="new">Newest activity</option>
+                    <option value="old">Oldest activity</option>
+                    <option value="unread">Unread first</option>
+                  </select>
+                </div>
+              </motion.div>
+
+              {/* Thread list */}
+              <div className="portal-scroll min-h-0 flex-1 overflow-auto bg-slate-50/60">
+                <AnimatePresence mode="wait">
+                  {!filteredThreads.length ? (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.2 }}
+                      className="px-6 py-12 text-center"
+                    >
+                      <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.05, duration: 0.2 }}
+                        className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border"
+                        style={{
+                          background: CREEK_BLUE_SOFT,
+                          borderColor: "#D7E3F7",
+                          color: CREEK_NAVY,
+                        }}
+                      >
+                        💬
+                      </motion.div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        No conversations found
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Try changing your search or filters.
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.ul
+                      key="list"
+                      ref={listRef}
+                      initial="hidden"
+                      animate="show"
+                      exit="hidden"
+                      variants={{
+                        hidden: {},
+                        show: {
+                          transition: {
+                            staggerChildren: 0.03,
+                          },
+                        },
+                      }}
+                      className="p-2"
+                    >
+                      {filteredThreads.map((c, i) => {
+                        const cid = Number(c.id);
+                        const preview = lastByClaim[cid] || "No messages yet";
+                        const unread = unreadByClaim[cid] || 0;
+                        const who = meIsStaff
+                          ? c.claimant_name || c.claimant_email || "Student"
+                          : `Staff • Claim #${cid}`;
+                        const initials = initialsFrom(
+                          c.claimant_name,
+                          c.claimant_email,
+                        );
+                        const lastAt =
+                          lastTimeByClaim[cid] || c.created_at || "";
+                        const isActive = i === activeIndex;
+
+                        return (
+                          <motion.li
+                            key={cid}
+                            variants={{
+                              hidden: { opacity: 0, y: 10 },
+                              show: { opacity: 1, y: 0 },
+                            }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            layout
+                            className="mb-2 last:mb-0"
+                          >
+                            <motion.button
+                              onClick={() => openThread(c)}
+                              whileHover={{ y: -1 }}
+                              whileTap={{ scale: 0.995 }}
+                              className={[
+                                "group flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition",
+                                isActive
+                                  ? "border-slate-300 bg-white ring-2 ring-slate-100"
+                                  : "border-transparent bg-white hover:border-slate-200 hover:bg-white hover:shadow-[0_8px_24px_rgba(11,44,92,0.08)]",
+                              ].join(" ")}
+                            >
+                              <div className="relative mt-0.5 shrink-0">
+                                <div className="avatar flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 text-[13px] font-semibold text-slate-700">
+                                  {initials}
+                                </div>
+
+                                <AnimatePresence>
+                                  {unread > 0 && (
+                                    <motion.span
+                                      initial={{ scale: 0.6, opacity: 0 }}
+                                      animate={{ scale: 1, opacity: 1 }}
+                                      exit={{ scale: 0.6, opacity: 0 }}
+                                      transition={{
+                                        type: "spring",
+                                        stiffness: 420,
+                                        damping: 24,
+                                      }}
+                                      className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white shadow-sm"
+                                      style={{ backgroundColor: CREEK_RED }}
+                                    >
+                                      {unread}
+                                    </motion.span>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+
+                              <div className="min-w-0 grow">
+                                <div className="flex items-start gap-2">
+                                  <div className="min-w-0 grow">
+                                    <div className="flex items-center gap-2">
+                                      <div className="truncate text-[14px] font-semibold text-slate-900">
+                                        {who}
+                                      </div>
+
+                                      {meIsStaff && (
+                                        <span
+                                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusPillClasses(
+                                            c.status,
+                                          )}`}
+                                        >
+                                          {c.status || "—"}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {meIsStaff && c.claimant_email && (
+                                      <div className="mt-0.5 truncate text-[12px] text-slate-500">
+                                        {c.claimant_email}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="shrink-0 text-right">
+                                    <div className="text-[11px] font-medium text-slate-500">
+                                      {timeAgo(lastAt)}
+                                    </div>
+                                    <div className="mt-1">
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                        #{cid}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 flex items-start gap-2">
+                                  {unread > 0 ? (
+                                    <motion.span
+                                      initial={{ scale: 0.7, opacity: 0 }}
+                                      animate={{ scale: 1, opacity: 1 }}
+                                      className="mt-[2px] inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                                      style={{ backgroundColor: CREEK_RED }}
+                                      aria-hidden="true"
+                                    />
+                                  ) : (
+                                    <span
+                                      className="mt-[2px] inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-slate-200"
+                                      aria-hidden="true"
+                                    />
+                                  )}
+
+                                  <p
+                                    className={`truncate text-[12.5px] ${
+                                      unread > 0
+                                        ? "font-medium text-slate-800"
+                                        : "text-slate-600"
+                                    }`}
+                                  >
+                                    {preview}
+                                  </p>
+                                </div>
+                              </div>
+                            </motion.button>
+                          </motion.li>
+                        );
+                      })}
+                    </motion.ul>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Footer */}
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, delay: 0.05 }}
+                className="border-t border-slate-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>
+                    {filteredThreads.length} conversation
+                    {filteredThreads.length === 1 ? "" : "s"}
+                  </span>
+                  <AnimatePresence mode="popLayout">
+                    <motion.span
+                      key={totalUnread}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      {totalUnread} unread
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Chat modal */}
