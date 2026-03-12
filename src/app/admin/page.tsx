@@ -176,6 +176,8 @@ export default function AdminPage() {
         return;
       }
 
+      //googoogaga
+
       const { data: prof, error: profErr } = await supabase
         .from("profiles")
         .select("role")
