@@ -1,10 +1,10 @@
-// src/app/auth/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { BASE } from "@/lib/basePath";
 import Link from "next/link";
+import { getLiveStats, type LiveStats } from "@/lib/getLiveStats";
 
 const CREEK_RED = "#BF1E2E";
 const CREEK_RED_DARK = "#A81524";
@@ -17,19 +17,51 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const [stats, setStats] = useState<LiveStats>({
+    totalItems: 0,
+    claimed: 0,
+    recent: 0,
+    claimRate: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const live = await getLiveStats();
+        if (!alive) return;
+        setStats(live);
+      } catch (e) {
+        console.error("Failed to load live stats:", e);
+      } finally {
+        if (alive) setStatsLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setLoading(true);
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
     setLoading(false);
+
     if (error) {
       setErr(error.message);
       return;
     }
+
     location.href = "/admin";
   };
 
@@ -37,7 +69,6 @@ export default function LoginPage() {
     <div className="min-h-screen grid md:grid-cols-2 bg-white text-slate-900">
       {/* ---------- Left: Hero image with overlay ---------- */}
       <div className="relative hidden md:flex">
-        {/* Creek ribbon */}
         <div
           className="absolute top-0 left-0 h-1.5 w-full z-20"
           style={{
@@ -45,7 +76,6 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Background photo */}
         <div
           aria-hidden
           className="absolute inset-0 bg-center bg-cover"
@@ -55,7 +85,6 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Dark gradient overlay */}
         <div
           aria-hidden
           className="absolute inset-0"
@@ -65,7 +94,6 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Subtle dot texture */}
         <div
           aria-hidden
           className="absolute inset-0 opacity-15 mix-blend-soft-light"
@@ -75,10 +103,8 @@ export default function LoginPage() {
           }}
         />
 
-        {/* Foreground content */}
         <div className="relative z-10 flex flex-col justify-between p-10 w-full text-white">
           <div className="space-y-6">
-            {/* Logo / Title */}
             <div className="flex items-center gap-3">
               <div
                 className="w-10 h-10 rounded-xl grid place-content-center font-bold shadow"
@@ -103,11 +129,19 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Quick stats (placeholder data) */}
           <div className="grid grid-cols-3 gap-3 text-white/95">
-            <Stat label="Total Items" value="128" />
-            <Stat label="Reunited" value="96" />
-            <Stat label="Claim Rate" value="75%" />
+            <Stat
+              label="Total Items"
+              value={statsLoading ? "—" : String(stats.totalItems)}
+            />
+            <Stat
+              label="Reunited"
+              value={statsLoading ? "—" : String(stats.claimed)}
+            />
+            <Stat
+              label="Claim Rate"
+              value={statsLoading ? "—" : `${stats.claimRate}%`}
+            />
           </div>
         </div>
       </div>
@@ -115,7 +149,6 @@ export default function LoginPage() {
       {/* ---------- Right: Sign-in Card ---------- */}
       <div className="flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-sm">
-          {/* Mobile header */}
           <div className="mb-6 md:hidden">
             <div className="flex items-center gap-3">
               <div
@@ -143,7 +176,6 @@ export default function LoginPage() {
             </p>
 
             <form onSubmit={signIn} className="mt-5 space-y-4">
-              {/* Email */}
               <div>
                 <label
                   htmlFor="email"
@@ -163,7 +195,6 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* Password */}
               <div>
                 <label
                   htmlFor="password"
@@ -193,7 +224,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Error */}
               {err && (
                 <div
                   className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
@@ -203,7 +233,6 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Submit */}
               <button
                 className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow hover:opacity-95 disabled:opacity-60 transition"
                 style={{
@@ -214,7 +243,6 @@ export default function LoginPage() {
                 {loading ? "Signing in…" : "Sign in"}
               </button>
 
-              {/* Footer actions */}
               <div className="flex items-center justify-between pt-1 text-sm">
                 <Link
                   href="/"
@@ -226,7 +254,6 @@ export default function LoginPage() {
             </form>
           </div>
 
-          {/* Small print */}
           <p className="mt-4 text-xs text-slate-500">
             By signing in, you agree to follow CCHS policies for student
             property and data protection.
@@ -237,7 +264,6 @@ export default function LoginPage() {
   );
 }
 
-/* ---------- Small Stat card ---------- */
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/20 bg-white/5 backdrop-blur p-4">
