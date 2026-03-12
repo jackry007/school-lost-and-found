@@ -137,7 +137,7 @@ export default function ChatModal({
             ) {
               await rpcMarkSeen(claimId);
             }
-          }
+          },
         )
         .subscribe((status) => {
           if (!cancelled && status === "SUBSCRIBED") setSubscribed(true);
@@ -231,8 +231,8 @@ export default function ChatModal({
     if (error || !data) {
       setMsgs((prev) =>
         prev.map((mm) =>
-          mm.id === tempId ? { ...mm, _error: error?.message || "Failed" } : mm
-        )
+          mm.id === tempId ? { ...mm, _error: error?.message || "Failed" } : mm,
+        ),
       );
       setSending(false);
       return;
@@ -240,7 +240,7 @@ export default function ChatModal({
 
     // Replace temp with server row
     setMsgs((prev) =>
-      prev.map((mm) => (mm.id === tempId ? (data as LocalMsg) : mm))
+      prev.map((mm) => (mm.id === tempId ? (data as LocalMsg) : mm)),
     );
 
     // My send doesn’t need mark seen; receiver will trigger on their end
@@ -249,154 +249,202 @@ export default function ChatModal({
 
   const connLabel = useMemo(
     () => (subscribed ? "Live" : "Connecting…"),
-    [subscribed]
+    [subscribed],
   );
 
   if (!open || !claim) return null;
 
   const modal = (
-    <div className="fixed inset-0 z-[1000]">
+    <div className="fixed inset-0 z-[9999]">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Shell */}
-      <div className="absolute inset-0 flex items-center justify-center p-4">
+      <div className="absolute inset-0 flex items-start justify-center px-4 pb-6 pt-24 sm:pt-28">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="chat-modal-title"
           className="
-            w-full max-w-lg
-            max-h-[min(90vh,800px)]
-            overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl
-            grid grid-rows-[auto,1fr,auto]
-          "
+          w-full max-w-3xl
+          max-h-[calc(100vh-8rem)]
+          overflow-hidden rounded-[28px] border border-slate-200/90 bg-white
+          shadow-[0_28px_90px_rgba(15,39,65,0.28)]
+          flex flex-col
+        "
         >
           {/* Header */}
-          <div className="flex items-center justify-between bg-gradient-to-r from-[#b10015] to-[#0f2741] px-4 py-3 text-white">
-            <div className="min-w-0">
-              <h3
-                id="chat-modal-title"
-                className="truncate text-base font-semibold"
-              >
-                Messages — Claim #{claim.id} (Item #{claim.item_id})
-              </h3>
-              <div className="mt-0.5 truncate text-xs text-white/80">
-                {claim.claimant_name || claim.claimant_email || "Student"}
+          <div className="relative shrink-0 overflow-hidden border-b border-slate-200">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#BF1E2E] via-[#7d1735] to-[#0B2C5C]" />
+            <div className="absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+            <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+
+            <div className="relative flex items-start justify-between gap-3 px-5 py-4 text-white">
+              <div className="min-w-0">
+                <h3
+                  id="chat-modal-title"
+                  className="truncate text-xl font-semibold tracking-tight"
+                >
+                  Messages — Claim #{claim.id}
+                  <span className="text-white/80">
+                    {" "}
+                    (Item #{claim.item_id})
+                  </span>
+                </h3>
+                <div className="mt-1 truncate text-sm text-white/85">
+                  {claim.claimant_name || claim.claimant_email || "Student"}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${
-                  subscribed ? "bg-white/20" : "bg-white/10"
-                }`}
-                title="Realtime status"
-              >
+
+              <div className="flex shrink-0 items-center gap-2">
                 <span
-                  className={`mr-1 inline-block h-2 w-2 rounded-full ${
-                    subscribed ? "bg-emerald-300" : "bg-amber-300 animate-pulse"
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${
+                    subscribed
+                      ? "border-white/20 bg-white/15 text-white"
+                      : "border-white/10 bg-white/10 text-white/90"
                   }`}
-                />
-                {connLabel}
-              </span>
-              <button
-                className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20"
-                onClick={onClose}
-              >
-                Close
-              </button>
+                  title="Realtime status"
+                >
+                  <span
+                    className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${
+                      subscribed
+                        ? "bg-emerald-300"
+                        : "bg-amber-300 animate-pulse"
+                    }`}
+                  />
+                  {connLabel}
+                </span>
+
+                <button
+                  className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Body */}
-          <div className="px-4 py-3 overflow-hidden">
+          <div className="min-h-0 flex-1 bg-slate-50/70 px-4 py-4 sm:px-5">
             <div
-              className="h-full overflow-y-auto rounded-xl border bg-white p-3"
-              style={{ maxHeight: "56vh", scrollBehavior: "smooth" }}
+              className="h-full overflow-y-auto rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+              style={{ scrollBehavior: "smooth" }}
             >
-              {msgs.length === 0 && (
-                <div className="py-8 text-center text-sm text-gray-500">
-                  No messages yet.
+              {msgs.length === 0 ? (
+                <div className="flex h-full min-h-[260px] flex-col items-center justify-center text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-2xl">
+                    💬
+                  </div>
+                  <div className="text-lg font-semibold text-slate-800">
+                    No messages yet
+                  </div>
+                  <div className="mt-1 max-w-sm text-sm text-slate-500">
+                    Start the conversation here. Messages between staff and the
+                    claimant will appear in this thread.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {msgs.map((m) => {
+                    const mine = m.sender_uid === currentUid;
+
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[82%] ${mine ? "items-end" : "items-start"} flex flex-col`}
+                        >
+                          {!mine && (
+                            <div className="mb-1 px-1 text-[11px] font-medium text-slate-500">
+                              {m.sender_role === "staff" ? "Staff" : "Student"}
+                            </div>
+                          )}
+
+                          <div
+                            className={`rounded-2xl px-4 py-3 text-[14px] leading-6 shadow-sm ${
+                              mine
+                                ? "rounded-br-md bg-gradient-to-r from-[#0B2C5C] to-[#204b87] text-white"
+                                : "rounded-bl-md border border-slate-200 bg-slate-100 text-slate-900"
+                            }`}
+                          >
+                            <div className="whitespace-pre-wrap break-words">
+                              {m.body}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`mt-1 px-1 text-[11px] ${
+                              mine ? "text-slate-500" : "text-slate-400"
+                            }`}
+                          >
+                            {fmtTime(m.created_at)}
+                            {m._temp && !m._error && " · sending…"}
+                            {m._error && (
+                              <span className="ml-1 font-medium text-rose-500">
+                                · failed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-
-              {msgs.map((m) => {
-                const mine = m.sender_uid === currentUid;
-                return (
-                  <div
-                    key={m.id}
-                    className={`mb-2 flex ${
-                      mine ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                        mine
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-900"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap break-words">
-                        {m.body}
-                      </div>
-                      <div
-                        className={`mt-1 text-[10px] ${
-                          mine ? "text-white/80" : "text-gray-500"
-                        }`}
-                      >
-                        {fmtTime(m.created_at)}
-                        {m._temp && !m._error && " · sending…"}
-                        {m._error && (
-                          <span className="ml-1 text-rose-400">· failed</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
               <div ref={endRef} />
             </div>
           </div>
 
           {/* Composer */}
-          <div className="border-t bg-white px-4 py-3">
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!sending) send();
-                  }
-                }}
-                placeholder="Type a message…  (Enter to send, Shift+Enter for newline)"
-                className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm
-                           text-gray-900 placeholder-gray-500
-                           focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                rows={1}
-                maxLength={4000}
-              />
+          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 sm:px-5">
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!sending) send();
+                    }
+                  }}
+                  placeholder="Type a message…"
+                  className="
+                  w-full resize-none rounded-[20px] border border-slate-300 bg-white px-4 py-3 text-sm
+                  text-slate-900 placeholder-slate-400 shadow-sm
+                  focus:border-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-100
+                "
+                  rows={1}
+                  maxLength={4000}
+                />
+                <div className="mt-2 flex items-center justify-between px-1 text-[11px] text-slate-500">
+                  <span>Enter to send · Shift+Enter for newline</span>
+                  <span className="text-slate-400">
+                    {input.length.toLocaleString()}/4,000
+                  </span>
+                </div>
+              </div>
+
               <button
                 onClick={send}
-                className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                className="
+                inline-flex h-[48px] shrink-0 items-center justify-center rounded-[18px]
+                bg-gradient-to-r from-[#BF1E2E] to-[#0B2C5C]
+                px-5 text-sm font-semibold text-white shadow-sm transition
+                hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50
+              "
                 disabled={sending || input.trim().length === 0}
               >
                 {sending ? "Sending…" : "Send"}
               </button>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
-              <span>
-                Press <kbd className="rounded border px-1">Enter</kbd> to send
-              </span>
-              <span className="text-gray-400">
-                {input.length.toLocaleString()}/4,000
-              </span>
             </div>
           </div>
         </div>
