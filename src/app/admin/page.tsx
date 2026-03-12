@@ -164,44 +164,55 @@ export default function AdminPage() {
   const load = async () => {
     setLoading(true);
 
-    const { data: userRes } = await supabase.auth.getUser();
-    const uid = userRes.user?.id;
+    try {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
 
-    if (!uid) {
-      router.replace("/auth/login");
-      return;
+      const uid = userRes.user?.id;
+      if (!uid) {
+        router.replace("/auth/login");
+        return;
+      }
+
+      const { data: prof, error: profErr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("uid", uid)
+        .single();
+
+      if (profErr) throw profErr;
+
+      if (!prof || !["admin", "staff"].includes(prof.role)) {
+        alert("Not authorized");
+        router.replace("/");
+        return;
+      }
+
+      setRole(prof.role as "admin" | "staff");
+
+      const [{ data: its, error: itemsErr }, { data: cls, error: claimsErr }] =
+        await Promise.all([
+          supabase
+            .from("items")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("claims")
+            .select("*")
+            .order("created_at", { ascending: false }),
+        ]);
+
+      if (itemsErr) throw itemsErr;
+      if (claimsErr) throw claimsErr;
+
+      setItems((its as Item[]) || []);
+      setClaims((cls as Claim[]) || []);
+    } catch (err) {
+      console.error("Admin load failed:", err);
+    } finally {
+      setLoading(false);
     }
-
-    const { data: prof, error: profErr } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("uid", uid)
-      .single();
-
-    if (profErr || !prof || !["admin", "staff"].includes(prof.role)) {
-      alert("Not authorized");
-      router.replace("/");
-      return;
-    }
-
-    setRole(prof.role as "admin" | "staff");
-
-    const [{ data: its }, { data: cls }] = await Promise.all([
-      supabase
-        .from("items")
-        .select("*")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("claims")
-        .select("*")
-        .order("created_at", { ascending: false }),
-    ]);
-
-    setItems((its as Item[]) || []);
-    setClaims((cls as Claim[]) || []);
-    setLoading(false);
   };
-
   async function loadActivity({ reset = false }: { reset?: boolean } = {}) {
     setLogLoading(true);
 

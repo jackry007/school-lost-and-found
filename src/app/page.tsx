@@ -78,20 +78,30 @@ export default function HomePage() {
   useEffect(() => {
     let mounted = true;
 
-    (async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (!mounted) return;
+    async function bootstrapAuth() {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (!mounted) return;
 
-      if (error) {
-        console.warn("auth.getUser error:", error.message);
+        if (error) {
+          console.error("auth.getSession error:", error.message);
+          setUser(null);
+        } else {
+          setUser(data.session?.user ?? null);
+        }
+      } catch (e: any) {
+        if (!mounted) return;
+        console.error("auth bootstrap failed:", e?.message ?? e);
         setUser(null);
-      } else {
-        setUser(data.user ?? null);
+      } finally {
+        if (mounted) setAuthLoading(false);
       }
-      setAuthLoading(false);
-    })();
+    }
+
+    void bootstrapAuth();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      if (!mounted) return;
       setUser(session?.user ?? null);
       setAuthLoading(false);
     });
@@ -138,9 +148,10 @@ export default function HomePage() {
 
   /* ---------- Recent items (AUTH only) ---------- */
   useEffect(() => {
+    let alive = true;
+
     if (authLoading) return;
 
-    // Not logged in => clear
     if (!user) {
       setItems([]);
       setErrMsg(null);
@@ -149,12 +160,13 @@ export default function HomePage() {
 
     (async () => {
       const { data, error } = await supabase
-        .schema("public")
         .from("items")
         .select("id, title, location, category, date_found, photo_url, status")
         .eq("status", "listed")
         .order("date_found", { ascending: false })
         .limit(8);
+
+      if (!alive) return;
 
       if (error) {
         setErrMsg(error.message);
@@ -162,7 +174,6 @@ export default function HomePage() {
       }
 
       const mapped: RecentCardItem[] = (data ?? []).map((row: any) => {
-        // default fallback
         let thumb = `${BASE}${FALLBACK_ITEM_IMAGE}`;
         const path: string | null = row.photo_url ?? null;
 
@@ -191,8 +202,11 @@ export default function HomePage() {
       setItems(mapped);
       setErrMsg(null);
     })();
-  }, [user, authLoading]);
 
+    return () => {
+      alive = false;
+    };
+  }, [user, authLoading]);
   return (
     <CreekPageShell>
       <HeroSection
