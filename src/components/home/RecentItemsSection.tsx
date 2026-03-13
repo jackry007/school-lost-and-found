@@ -85,24 +85,24 @@ export function RecentItemsSection({
   onReport,
 }: RecentItemsSectionProps) {
   return (
-    <motion.main
-      className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+    <motion.section
+      className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8"
       initial="hidden"
       animate="show"
       variants={fadeUp}
     >
       <AnimatePresence mode="wait">
         {authLoading ? (
-          <motion.section
+          <motion.div
             key="loading"
-            className="rounded-2xl border border-dashed border-gray-300 py-12 text-center"
+            className="rounded-2xl border border-dashed border-gray-300 py-10 text-center sm:py-12"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
           >
             <p className="text-sm text-gray-600">Loading…</p>
-          </motion.section>
+          </motion.div>
         ) : !isAuthed ? (
           <motion.div
             key="gate"
@@ -128,19 +128,24 @@ export function RecentItemsSection({
           >
             <motion.div
               variants={fadeUp}
-              className="mb-4 flex items-center justify-between"
+              className="mb-4 flex items-end justify-between gap-3"
             >
-              <h2
-                className="text-lg font-semibold"
-                style={{ color: creekNavy }}
-              >
-                Recently Reported
-              </h2>
+              <div className="min-w-0">
+                <h2
+                  className="text-xl font-extrabold tracking-tight sm:text-2xl"
+                  style={{ color: creekNavy }}
+                >
+                  Recently Reported
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Latest found items added by staff and students.
+                </p>
+              </div>
 
               <motion.button
                 type="button"
                 onClick={onViewAll}
-                className="text-sm underline"
+                className="shrink-0 text-sm font-medium underline underline-offset-2"
                 style={{ color: creekRed }}
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.98 }}
@@ -150,7 +155,7 @@ export function RecentItemsSection({
             </motion.div>
 
             <motion.ul
-              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:gap-4"
               variants={staggerWrap}
             >
               {items.map((it) => (
@@ -158,8 +163,9 @@ export function RecentItemsSection({
                   key={it.id}
                   variants={cardMotion}
                   layout
-                  whileHover={{ y: -4 }}
+                  whileHover={{ y: -3 }}
                   transition={{ duration: 0.18 }}
+                  className="min-w-0"
                 >
                   <ItemCard item={it as any} />
                 </motion.li>
@@ -178,7 +184,7 @@ export function RecentItemsSection({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.main>
+    </motion.section>
   );
 }
 
@@ -196,7 +202,7 @@ function LoginGateCard({
   onReport: () => void;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-white py-16">
+    <section className="relative overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-white py-12 sm:py-16">
       <motion.div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
         style={{
@@ -210,24 +216,24 @@ function LoginGateCard({
       />
 
       <motion.div
-        className="relative mx-auto flex max-w-xl flex-col items-center px-6 text-center"
+        className="relative mx-auto flex max-w-xl flex-col items-center px-5 text-center sm:px-6"
         initial="hidden"
         animate="show"
         variants={staggerWrap}
       >
         <motion.div
           variants={popIn}
-          className="mb-4 grid h-14 w-14 place-items-center rounded-2xl border bg-white shadow-sm"
+          className="mb-4 grid h-12 w-12 place-items-center rounded-2xl border bg-white shadow-sm sm:h-14 sm:w-14"
           style={{ borderColor: "rgba(11,44,92,0.18)" }}
           aria-hidden="true"
           whileHover={{ y: -2, rotate: -3 }}
         >
-          <span className="text-2xl">🎒</span>
+          <span className="text-xl sm:text-2xl">🎒</span>
         </motion.div>
 
         <motion.p
           variants={fadeUp}
-          className="text-2xl font-semibold"
+          className="text-xl font-semibold sm:text-2xl"
           style={{ color: creekNavy }}
         >
           Looking for something you lost?
@@ -243,7 +249,7 @@ function LoginGateCard({
 
         <motion.div
           variants={fadeUp}
-          className="mt-6 flex flex-col items-center gap-3 sm:flex-row"
+          className="mt-6 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center"
         >
           <motion.button
             type="button"
@@ -293,16 +299,16 @@ function EmptyState({
   onReport: () => void;
 }) {
   return (
-    <section className="grid place-items-center rounded-2xl border border-dashed border-gray-300 py-16">
+    <section className="grid place-items-center rounded-2xl border border-dashed border-gray-300 py-12 sm:py-16">
       <motion.div
-        className="text-center"
+        className="text-center px-4"
         initial="hidden"
         animate="show"
         variants={staggerWrap}
       >
         <motion.div
           variants={popIn}
-          className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 bg-white text-xl shadow-sm"
+          className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-gray-200 bg-white text-xl shadow-sm sm:h-14 sm:w-14"
         >
           📭
         </motion.div>
