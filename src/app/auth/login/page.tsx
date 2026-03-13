@@ -69,7 +69,10 @@ export default function LoginPage() {
     <div
       className="min-h-screen text-slate-900 md:grid md:grid-cols-2"
       style={{
-        background: "linear-gradient(180deg, #fbfdff 0%, #f3f7fc 100%)",
+        backgroundColor: "#f8fbff",
+        backgroundImage:
+          "radial-gradient(rgba(11,44,92,0.06) 1px, transparent 1px), linear-gradient(180deg, #fbfdff 0%, #f4f8fd 100%)",
+        backgroundSize: "18px 18px, 100% 100%",
       }}
     >
       {/* ---------- Left: Hero image with overlay ---------- */}
