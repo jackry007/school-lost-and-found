@@ -66,11 +66,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid md:grid-cols-2 bg-white text-slate-900">
+    <div
+      className="min-h-screen text-slate-900 md:grid md:grid-cols-2"
+      style={{
+        background: "linear-gradient(180deg, #fbfdff 0%, #f3f7fc 100%)",
+      }}
+    >
       {/* ---------- Left: Hero image with overlay ---------- */}
       <div className="relative hidden md:flex">
         <div
-          className="absolute top-0 left-0 h-1.5 w-full z-20"
+          className="absolute left-0 top-0 z-20 h-1.5 w-full"
           style={{
             background: `linear-gradient(90deg, ${CREEK_RED} 0%, ${CREEK_RED_DARK} 100%)`,
           }}
@@ -78,7 +83,7 @@ export default function LoginPage() {
 
         <div
           aria-hidden
-          className="absolute inset-0 bg-center bg-cover"
+          className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: `url(${BASE}/images/authHero.png)`,
             backgroundAttachment: "fixed",
@@ -103,11 +108,11 @@ export default function LoginPage() {
           }}
         />
 
-        <div className="relative z-10 flex flex-col justify-between p-10 w-full text-white">
+        <div className="relative z-10 flex w-full flex-col justify-between p-10 text-white">
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-xl grid place-content-center font-bold shadow"
+                className="grid h-10 w-10 place-content-center rounded-xl font-bold shadow"
                 style={{ background: CREEK_RED }}
                 aria-hidden
               >
@@ -123,7 +128,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <p className="text-white/90 max-w-sm">
+            <p className="max-w-sm text-white/90">
               Fast, fair, and secure—sign in to review claims and keep items
               moving back to their owners.
             </p>
@@ -147,31 +152,31 @@ export default function LoginPage() {
       </div>
 
       {/* ---------- Right: Sign-in Card ---------- */}
-      <div className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-sm">
-          <div className="mb-6 md:hidden">
+      <div className="flex items-start justify-center px-5 pb-10 pt-8 sm:px-8 sm:pt-10 md:items-center md:p-10">
+        <div className="w-full max-w-md">
+          <div className="mb-5 md:hidden">
             <div className="flex items-center gap-3">
               <div
-                className="w-9 h-9 rounded-xl grid place-content-center text-white font-bold shadow"
+                className="grid h-10 w-10 place-content-center rounded-xl text-white font-bold shadow"
                 style={{ background: CREEK_RED }}
                 aria-hidden
               >
                 🎒
               </div>
               <div>
-                <div className="text-xs tracking-wide text-slate-600">
+                <div className="text-[11px] tracking-wide text-slate-600">
                   Cherry Creek High School
                 </div>
-                <h1 className="text-lg font-semibold">
+                <h1 className="text-xl font-bold leading-tight">
                   Lost &amp; Found — Admin
                 </h1>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 shadow-[0_6px_24px_rgba(2,6,23,0.06)] p-6 sm:p-7 bg-white">
-            <h2 className="text-xl font-semibold">Admin Sign in</h2>
-            <p className="text-sm text-slate-600 mt-1">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_24px_rgba(2,6,23,0.06)] sm:p-7">
+            <h2 className="text-2xl font-semibold">Admin Sign in</h2>
+            <p className="mt-1 text-sm text-slate-600">
               Authorized staff and admins only.
             </p>
 
@@ -185,7 +190,7 @@ export default function LoginPage() {
                 </label>
                 <input
                   id="email"
-                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:ring-4 focus:ring-[rgba(191,30,46,0.15)] focus:border-[rgba(191,30,46,1)]"
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-[rgba(191,30,46,1)] focus:ring-4 focus:ring-[rgba(191,30,46,0.15)]"
                   placeholder="you@cherrycreekschools.org"
                   type="email"
                   autoComplete="email"
@@ -202,10 +207,10 @@ export default function LoginPage() {
                 >
                   Password
                 </label>
-                <div className="mt-1 relative">
+                <div className="relative mt-1">
                   <input
                     id="password"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pr-12 text-sm outline-none focus:ring-4 focus:ring-[rgba(191,30,46,0.15)] focus:border-[rgba(191,30,46,1)]"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 pr-14 text-sm outline-none focus:border-[rgba(191,30,46,1)] focus:ring-4 focus:ring-[rgba(191,30,46,0.15)]"
                     placeholder="••••••••"
                     type={showPw ? "text" : "password"}
                     autoComplete="current-password"
@@ -234,7 +239,7 @@ export default function LoginPage() {
               )}
 
               <button
-                className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow hover:opacity-95 disabled:opacity-60 transition"
+                className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition hover:opacity-95 disabled:opacity-60"
                 style={{
                   background: `linear-gradient(180deg, ${CREEK_RED} 0%, ${CREEK_RED_DARK} 100%)`,
                 }}
@@ -246,7 +251,7 @@ export default function LoginPage() {
               <div className="flex items-center justify-between pt-1 text-sm">
                 <Link
                   href="/"
-                  className="text-slate-600 hover:text-slate-900 underline-offset-4 hover:underline"
+                  className="text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
                 >
                   ← Back to site
                 </Link>
@@ -254,7 +259,7 @@ export default function LoginPage() {
             </form>
           </div>
 
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-3 px-1 text-xs leading-5 text-slate-500">
             By signing in, you agree to follow CCHS policies for student
             property and data protection.
           </p>
@@ -266,7 +271,7 @@ export default function LoginPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/20 bg-white/5 backdrop-blur p-4">
+    <div className="rounded-xl border border-white/20 bg-white/5 p-4 backdrop-blur">
       <div className="text-xs uppercase tracking-wide text-white/70">
         {label}
       </div>
