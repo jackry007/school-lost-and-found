@@ -17,7 +17,7 @@ export async function approveClaimRPC(claimId: number, adminUid: string) {
 export async function requestInfoRPC(
   claimId: number,
   adminUid: string,
-  msg?: string
+  msg?: string,
 ) {
   const { error } = await supabase.rpc("request_info_claim", {
     p_claim_id: claimId,
@@ -30,7 +30,7 @@ export async function requestInfoRPC(
 export async function rejectClaimRPC(
   claimId: number,
   adminUid: string,
-  reason?: string
+  reason?: string,
 ) {
   const { error } = await supabase.rpc("reject_claim", {
     p_claim_id: claimId,
