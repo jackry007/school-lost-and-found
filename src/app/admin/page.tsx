@@ -481,11 +481,29 @@ export default function AdminPage() {
 
     try {
       const info = await approveClaimRPC(c.id, uid);
+      const pickupCode = info?.pickup_code ?? null;
 
-      if (info?.pickup_code) {
-        addToast(`Claim #${c.id} approved. Code: ${info.pickup_code}`);
+      const autoMsg = pickupCode
+        ? `Your claim has been approved. Please come to the office to pick up your item. Be sure to bring proof of ownership. Your pickup code is: ${pickupCode}.`
+        : `Your claim has been approved. Please come to the office to pick up your item. Be sure to bring proof of ownership.`;
+
+      const { error: msgError } = await supabase.from("claim_messages").insert({
+        claim_id: c.id,
+        sender_uid: uid,
+        sender_role: "staff",
+        body: autoMsg,
+        seen_by_claimant: false,
+        seen_by_staff: true,
+      });
+
+      if (msgError) {
+        console.error("Auto message failed:", msgError);
+      }
+
+      if (pickupCode) {
+        addToast(`Claim #${c.id} approved. Code: ${pickupCode}`);
         try {
-          await navigator.clipboard.writeText(info.pickup_code);
+          await navigator.clipboard.writeText(pickupCode);
           addToast("Pickup code copied.");
         } catch {
           // ignore clipboard failures
@@ -494,7 +512,12 @@ export default function AdminPage() {
         addToast(`Claim #${c.id} approved.`);
       }
 
-      await logEvent("approve_claim", "claim", c.id, { item_id: c.item_id });
+      await logEvent("approve_claim", "claim", c.id, {
+        item_id: c.item_id,
+        pickup_code: pickupCode,
+        auto_message_sent: !msgError,
+      });
+
       await load();
     } catch (e: any) {
       addToast(`Approve failed: ${e.message || e}`);
