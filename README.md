@@ -68,21 +68,6 @@ This platform replaces that process with a secure, searchable, and moderated sys
 
 ---
 
-## 🖼 Screenshots
-
-> Replace these with real images in your repo.
-
-### Homepage
-![Homepage](docs/screenshots/home.png)
-
-### Search Page
-![Search Page](docs/screenshots/search.png)
-
-### Admin Dashboard
-![Admin Dashboard](docs/screenshots/admin.png)
-
----
-
 ## 🧱 Tech Stack
 
 **Frontend**
