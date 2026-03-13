@@ -13,7 +13,6 @@ import {
   Thumb,
   SectionHeading,
 } from "@/lib/admin/components";
-import { CompactLogRow } from "@/components/admin/rows/CompactLogRow";
 
 type Props = {
   items: Item[];
@@ -54,7 +53,6 @@ type Props = {
   }) => void;
 
   onOpenChat: (c: Claim) => void;
-  onOpenSchedule: (c: Claim) => void;
   onAskApproveClaim: (c: Claim) => void;
   onAskRejectClaim: (c: Claim) => void;
 };
@@ -66,19 +64,6 @@ function publicUrlFromPath(path?: string | null) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   return `${SB_URL}/storage/v1/object/public/${BUCKET}/${path}`;
-}
-
-function formatSchedChip(iso: string) {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
-  const time = d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `${date} · ${time}`;
 }
 
 export default function OverviewSection({
@@ -110,7 +95,6 @@ export default function OverviewSection({
 
   onOpenPhotos,
   onOpenChat,
-  onOpenSchedule,
   onAskApproveClaim,
   onAskRejectClaim,
 }: Props) {
@@ -382,13 +366,6 @@ export default function OverviewSection({
                 pendingClaims.slice(0, 3).map((c) => {
                   const item = itemsById[c.item_id];
                   const t = claimThumbs[c.id];
-
-                  const sched = (c as any).schedule_at as
-                    | string
-                    | null
-                    | undefined;
-                  const schedChip = sched ? formatSchedChip(sched) : null;
-
                   const itemPreviewSrc = getItemPreviewSrc(item);
 
                   const claimViewerUrls = (
@@ -455,14 +432,6 @@ export default function OverviewSection({
                               ({(c as any).claimant_email})
                             </span>
                           </div>
-
-                          {schedChip && (
-                            <div className="mt-2">
-                              <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
-                                Scheduled: {schedChip}
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -497,13 +466,6 @@ export default function OverviewSection({
                           <Btn tone="message" onClick={() => onOpenChat(c)}>
                             Message
                           </Btn>
-
-                          <Btn
-                            tone="schedule"
-                            onClick={() => onOpenSchedule(c)}
-                          >
-                            {schedChip ? "Reschedule" : "Schedule"}
-                          </Btn>
                         </div>
 
                         <div
@@ -533,43 +495,6 @@ export default function OverviewSection({
           </Card>
         </div>
       </section>
-
-      {/* <section className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div
-            className="h-7 w-1.5 rounded-full"
-            style={{ background: CREEK_NAVY }}
-            aria-hidden
-          />
-          <SectionHeading>Recent Activity</SectionHeading>
-        </div>
-
-        <Card className="overflow-hidden p-0">
-          {!logLoadedOnce ? (
-            <div className="p-4 text-sm text-gray-500">
-              Open the Activity tab to load logs…
-            </div>
-          ) : logLoading ? (
-            <div className="p-4 text-sm text-gray-500">Loading…</div>
-          ) : logRows.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-600">
-              No activity yet.
-            </div>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {logRows.slice(0, 8).map((r) => (
-                <CompactLogRow key={r.event_id ?? r.id} row={r} />
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <div className="flex justify-end">
-          <Btn tone="ghost" onClick={onOpenActivityTab}>
-            Open full Activity Log →
-          </Btn>
-        </div>
-      </section> */}
     </div>
   );
 }

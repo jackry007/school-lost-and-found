@@ -1,4 +1,3 @@
-// src/app/admin/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -43,7 +42,6 @@ import EditItemModal, {
 } from "@/components/admin/modals/EditItemModal";
 import ApproveItemConfirmModal from "@/components/admin/modals/ApproveItemConfirmModal";
 import PhotoLightboxModal from "@/components/admin/modals/PhotoLightboxModal";
-import SchedulePickupModal from "@/components/admin/modals/SchedulePickupModal";
 
 /* ✅ shared type */
 import type { StatusFilter } from "@/components/admin/types";
@@ -110,12 +108,6 @@ export default function AdminPage() {
   >();
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
 
-  // Schedule modal
-  const [schedOpen, setSchedOpen] = useState(false);
-  const [schedClaim, setSchedClaim] = useState<Claim | null>(null);
-  const [schedAt, setSchedAt] = useState("");
-  const [schedBusy, setSchedBusy] = useState(false);
-
   // Chat modal
   const [chatOpen, setChatOpen] = useState(false);
   const [chatClaim, setChatClaim] = useState<Claim | null>(null);
@@ -176,8 +168,6 @@ export default function AdminPage() {
         return;
       }
 
-      //googoogaga
-
       const { data: prof, error: profErr } = await supabase
         .from("profiles")
         .select("role")
@@ -217,6 +207,7 @@ export default function AdminPage() {
       setLoading(false);
     }
   };
+
   async function loadActivity({ reset = false }: { reset?: boolean } = {}) {
     setLogLoading(true);
 
@@ -638,55 +629,10 @@ export default function AdminPage() {
     }
   }
 
-  /* ---------------- Schedule + Chat helpers ---------------- */
-  function openSchedule(c: Claim) {
-    setSchedClaim(c);
-    const at = (c as any).schedule_at as string | null | undefined;
-    setSchedAt(at ? new Date(at).toISOString().slice(0, 16) : "");
-    setSchedOpen(true);
-  }
-
+  /* ---------------- Chat helpers ---------------- */
   function openChat(c: Claim) {
     setChatClaim(c);
     setChatOpen(true);
-  }
-
-  async function saveSchedule() {
-    if (!schedClaim) return;
-
-    setSchedBusy(true);
-    const iso = schedAt ? new Date(schedAt).toISOString() : null;
-
-    const { error } = await supabase
-      .from("claims")
-      .update({ schedule_at: iso })
-      .eq("id", schedClaim.id);
-
-    setSchedBusy(false);
-
-    if (error) {
-      addToast(`Error scheduling: ${error.message}`);
-      return;
-    }
-
-    addToast(
-      iso
-        ? `Pickup scheduled for claim #${schedClaim.id}`
-        : `Pickup cleared for claim #${schedClaim.id}`,
-    );
-
-    await logEvent(
-      iso ? "schedule_set" : "schedule_cleared",
-      "claim",
-      schedClaim.id,
-      {
-        at: iso,
-      },
-    );
-
-    setSchedOpen(false);
-    setSchedClaim(null);
-    await load();
   }
 
   /* ---------------- Derived ---------------- */
@@ -773,7 +719,6 @@ export default function AdminPage() {
             onEditItem={openEdit}
             onOpenPhotos={openPhotos}
             onOpenChat={openChat}
-            onOpenSchedule={openSchedule}
             onAskApproveClaim={askApproveClaim}
             onAskRejectClaim={askRejectClaim}
           />
@@ -826,16 +771,6 @@ export default function AdminPage() {
         description={photoDescription}
         urls={photoUrls}
         onClose={() => setPhotoOpen(false)}
-      />
-
-      <SchedulePickupModal
-        open={schedOpen}
-        claim={schedClaim}
-        schedAt={schedAt}
-        setSchedAt={setSchedAt}
-        busy={schedBusy}
-        onClose={() => setSchedOpen(false)}
-        onSave={saveSchedule}
       />
 
       <ApproveItemConfirmModal
