@@ -27,6 +27,7 @@ type Props = {
 
   pendingItems: Item[];
   pendingClaims: Claim[];
+  approvedClaims: Claim[];
   thumbMap: Record<number, string>;
   claimThumbs: Record<
     number,
@@ -55,6 +56,9 @@ type Props = {
   onOpenChat: (c: Claim) => void;
   onAskApproveClaim: (c: Claim) => void;
   onAskRejectClaim: (c: Claim) => void;
+  onMarkPickedUpClaim: (c: Claim) => void;
+  onCopyPickupCode: (code?: string | null) => void;
+  markBusy: boolean;
 };
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -64,6 +68,17 @@ function publicUrlFromPath(path?: string | null) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   return `${SB_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+}
+
+function formatApprovedAt(iso?: string | null) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 export default function OverviewSection({
@@ -79,6 +94,7 @@ export default function OverviewSection({
 
   pendingItems,
   pendingClaims,
+  approvedClaims,
   thumbMap,
   claimThumbs,
 
@@ -97,6 +113,9 @@ export default function OverviewSection({
   onOpenChat,
   onAskApproveClaim,
   onAskRejectClaim,
+  onMarkPickedUpClaim,
+  onCopyPickupCode,
+  markBusy,
 }: Props) {
   const topCatsPreview = useMemo(() => topCats.slice(0, 4), [topCats]);
 
@@ -440,29 +459,6 @@ export default function OverviewSection({
                           className="flex flex-wrap gap-2 md:justify-end"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {t?.proofs?.length ? (
-                            <button
-                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-md active:scale-[0.98]"
-                              onClick={() =>
-                                onOpenPhotos({
-                                  title: item?.title
-                                    ? `#${item.id} · ${item.title}`
-                                    : `Proof photos — Claim #${c.id}`,
-                                  urls: t.proofs || [],
-                                  category: item?.category ?? undefined,
-                                  location:
-                                    (item as any)?.location ?? undefined,
-                                  description:
-                                    getItemDescription(item) ??
-                                    `Submitted by ${(c as any).claimant_name || "student"} · ${(c as any).claimant_email || ""}`,
-                                })
-                              }
-                              title="View proof photos"
-                            >
-                              View Proofs ({t.proofs.length})
-                            </button>
-                          ) : null}
-
                           <Btn tone="message" onClick={() => onOpenChat(c)}>
                             Message
                           </Btn>
@@ -494,6 +490,170 @@ export default function OverviewSection({
             </div>
           </Card>
         </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="h-7 w-1.5 rounded-full"
+            style={{ background: CREEK_NAVY }}
+            aria-hidden
+          />
+          <SectionHeading>Ready for Pickup</SectionHeading>
+          <span
+            className="hidden rounded-full border px-3 py-1 text-sm font-semibold md:inline-flex"
+            style={{
+              color: "#166534",
+              borderColor: "#BBF7D0",
+              background: "#F0FDF4",
+            }}
+          >
+            Approved claims
+          </span>
+        </div>
+
+        <Card className="overflow-hidden p-0">
+          <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
+            <div className="text-base font-semibold text-gray-900">
+              Approved Claims{" "}
+              <span className="font-medium text-gray-500">
+                ({approvedClaims.length})
+              </span>
+            </div>
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {approvedClaims.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-gray-600">
+                No approved claims waiting for pickup.
+              </div>
+            ) : (
+              approvedClaims.slice(0, 5).map((c) => {
+                const item = itemsById[c.item_id];
+                const t = claimThumbs[c.id];
+                const itemPreviewSrc = getItemPreviewSrc(item);
+                const approvedLabel = formatApprovedAt(
+                  (c as any).approved_at as string | null | undefined,
+                );
+
+                const claimViewerUrls = (
+                  t?.proofs?.length
+                    ? t.proofs
+                    : t?.itemThumb
+                      ? [t.itemThumb]
+                      : itemPreviewSrc
+                        ? [itemPreviewSrc]
+                        : []
+                ) as string[];
+
+                return (
+                  <Row key={c.id} className="px-3 py-2">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          claimViewerUrls.length
+                            ? onOpenPhotos({
+                                title: item?.title
+                                  ? `#${item.id} · ${item.title}`
+                                  : `Item #${c.item_id}`,
+                                urls: claimViewerUrls,
+                                category: item?.category ?? undefined,
+                                location: (item as any)?.location ?? undefined,
+                                description:
+                                  getItemDescription(item) ??
+                                  `Approved claim for ${(c as any).claimant_name || "student"}`,
+                              })
+                            : undefined
+                        }
+                        disabled={!claimViewerUrls.length}
+                        className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
+                        title={
+                          t?.proofs?.length
+                            ? "Click to view proof photos"
+                            : "Click to view item photo"
+                        }
+                      >
+                        <Thumb
+                          src={t?.itemThumb || itemPreviewSrc}
+                          alt={`Item #${c.item_id}`}
+                        />
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-semibold text-gray-800">
+                          {item?.title
+                            ? `Claim #${c.id} → ${item.title}`
+                            : `Claim #${c.id} → Item #${c.item_id}`}
+                        </div>
+
+                        <div className="mt-0.5 text-xs text-gray-600">
+                          {(c as any).claimant_name}
+                          <span className="text-gray-400">
+                            {" "}
+                            ({(c as any).claimant_email})
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {(c as any).pickup_code ? (
+                            <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">
+                              Code: {(c as any).pickup_code}
+                            </span>
+                          ) : null}
+
+                          {approvedLabel ? (
+                            <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                              Approved {approvedLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 md:w-auto md:min-w-[300px] md:items-end">
+                      <div
+                        className="flex flex-wrap gap-2 md:justify-end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Btn tone="message" onClick={() => onOpenChat(c)}>
+                          Message
+                        </Btn>
+
+                        <Btn
+                          tone="ghost"
+                          onClick={() =>
+                            onCopyPickupCode(
+                              (c as any).pickup_code as
+                                | string
+                                | null
+                                | undefined,
+                            )
+                          }
+                        >
+                          Copy Code
+                        </Btn>
+                      </div>
+
+                      <div
+                        className="flex flex-wrap gap-2 md:justify-end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Btn
+                          tone="success"
+                          onClick={() => onMarkPickedUpClaim(c)}
+                          disabled={markBusy}
+                        >
+                          {markBusy ? "Working…" : "Mark Picked Up"}
+                        </Btn>
+                      </div>
+                    </div>
+                  </Row>
+                );
+              })
+            )}
+          </div>
+        </Card>
       </section>
     </div>
   );
