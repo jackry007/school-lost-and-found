@@ -201,21 +201,21 @@ export function Header() {
   }, [panelOpen, closePanel]);
 
   // ✅ Guarded navigation: if guest -> open login panel and remember target
-function guardedGo(targetHref: string) {
-  if (auth === "loading") return;
+  function guardedGo(targetHref: string) {
+    if (auth === "loading") return;
 
-  if (auth === "authed") {
-    router.push(targetHref);
-    return;
+    if (auth === "authed") {
+      router.push(targetHref);
+      return;
+    }
+
+    if (targetHref === "/admin") {
+      router.push("/auth/login?next=/admin");
+      return;
+    }
+
+    openPanel(targetHref);
   }
-
-  if (targetHref === "/admin") {
-    router.push("/auth/login?next=/admin");
-    return;
-  }
-
-  openPanel(targetHref);
-}
 
   // Handle login
   async function handleLogin(e: React.FormEvent) {
@@ -393,7 +393,10 @@ function guardedGo(targetHref: string) {
           </div>
 
           {/* Right: Mobile menu + Search + Auth */}
-          <div className="relative flex items-center gap-3" ref={mobileRef}>
+          <div
+            className="relative flex items-center gap-2 sm:gap-3"
+            ref={mobileRef}
+          >
             {/* ✅ Mobile hamburger */}
             <button
               type="button"
@@ -417,7 +420,7 @@ function guardedGo(targetHref: string) {
               type="button"
               onClick={() => guardedGo("/search")}
               className={[
-                "inline-flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-sm font-medium",
+                "inline-flex items-center justify-center rounded-full px-3 sm:px-4 py-2 text-sm font-medium",
                 "border border-white/30 bg-white/10 hover:bg-white/18",
                 "focus:outline-none focus:ring-2 focus:ring-white/60 transition",
               ].join(" ")}
@@ -505,11 +508,11 @@ function guardedGo(targetHref: string) {
             )}
 
             {auth === "authed" && (
-              <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2">
                 <MessagesPortal />
 
                 <span
-                  className="hidden sm:inline max-w-[170px] truncate rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm"
+                  className="hidden lg:inline max-w-[170px] truncate rounded-full border border-white/30 bg-white/10 px-3 py-2 text-sm"
                   title={userEmail ?? ""}
                 >
                   {userEmail}
@@ -532,11 +535,13 @@ function guardedGo(targetHref: string) {
         <div
           id="mobile-nav"
           className={[
-            "md:hidden overflow-hidden transition-[max-height] duration-300 ease-out",
-            mobileOpen ? "max-h-72" : "max-h-0",
+            "md:hidden transition-[max-height] duration-300 ease-out",
+            mobileOpen
+              ? "max-h-[32rem] overflow-y-auto"
+              : "max-h-0 overflow-hidden",
           ].join(" ")}
         >
-          <div className="mx-auto max-w-7xl px-4 pb-3">
+          <div className="mx-auto max-w-7xl px-4 pb-5">
             <div className="rounded-2xl border border-white/20 bg-white/10 p-2">
               <div className="grid gap-2">
                 {nav.map((n) => {
@@ -569,7 +574,7 @@ function guardedGo(targetHref: string) {
                       href={n.href}
                       onClick={() => setMobileOpen(false)}
                       className={[
-                        "no-underline decoration-0 block rounded-xl px-4 py-3 text-sm font-semibold transition",
+                        "block rounded-xl px-4 py-3 text-sm font-semibold no-underline decoration-0 transition",
                         active
                           ? "bg-yellow-400 text-red-900"
                           : "text-white hover:bg-white/15",
@@ -580,15 +585,43 @@ function guardedGo(targetHref: string) {
                     </Link>
                   );
                 })}
-              </div>
 
-              {/* Optional: show signed-in email on mobile */}
-              {auth === "authed" && userEmail && (
-                <div className="mt-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs text-white/90 truncate">
-                  Signed in as:{" "}
-                  <span className="font-semibold">{userEmail}</span>
-                </div>
-              )}
+                {/* mobile-only signed-in actions */}
+                {auth === "authed" && (
+                  <>
+                    <div className="my-1 h-px bg-white/15" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        guardedGo("/messages");
+                      }}
+                      className="w-full text-left rounded-xl px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                    >
+                      Messages
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left rounded-xl px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                    >
+                      Log out
+                    </button>
+
+                    {userEmail && (
+                      <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs text-white/90 truncate">
+                        Signed in as:{" "}
+                        <span className="font-semibold">{userEmail}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
