@@ -46,7 +46,7 @@ export function StoriesSection({
   creekNavy,
 }: StoriesSectionProps) {
   return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10">
+    <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 sm:pb-10 lg:px-8">
       <SectionHeader
         title="Success stories"
         kicker="Real wins"
@@ -59,7 +59,7 @@ export function StoriesSection({
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
-        className="mt-4 grid gap-5 md:grid-cols-3"
+        className="mt-4 grid gap-4 sm:gap-5 md:grid-cols-3"
       >
         {stories.map((s) => (
           <CaseFile
@@ -94,7 +94,7 @@ function CaseFile({
       variants={fadeUp}
       whileHover={{ y: -6, scale: 1.01 }}
       whileTap={{ scale: 0.985 }}
-      className="group relative overflow-hidden rounded-xl border bg-white p-5 shadow-sm will-change-transform hover:shadow-lg"
+      className="group relative overflow-hidden rounded-xl border bg-white p-4 shadow-sm will-change-transform hover:shadow-lg sm:p-5"
       style={{ borderColor: "#E5E7EB" }}
     >
       {/* animated left stripe */}
@@ -108,24 +108,28 @@ function CaseFile({
       />
 
       <div className="flex items-center gap-3">
-        <div className="text-2xl" aria-hidden="true">
+        <div className="text-xl sm:text-2xl" aria-hidden="true">
           {icon}
         </div>
-        <h3 className="font-semibold" style={{ color: creekNavy }}>
+
+        <h3
+          className="text-sm font-semibold sm:text-base"
+          style={{ color: creekNavy }}
+        >
           {title}
         </h3>
       </div>
 
-      <p className="mt-3 text-sm text-gray-700">{blurb}</p>
+      <p className="mt-2.5 text-sm leading-relaxed text-gray-700">{blurb}</p>
 
       {ctaHref && (
         <Link
           href={ctaHref}
           onClick={(e) => {
-            e.preventDefault(); // stop instant navigation
-            goProtected(ctaHref); // login gate + redirect
+            e.preventDefault();
+            goProtected(ctaHref);
           }}
-          className="mt-4 inline-block text-sm font-medium underline"
+          className="mt-4 inline-block text-sm font-medium underline underline-offset-2"
           style={{ color: creekRed }}
         >
           {ctaLabel ?? "Learn more"}
@@ -135,7 +139,7 @@ function CaseFile({
   );
 }
 
-/* ---------- Section Header (local copy) ---------- */
+/* ---------- Section Header ---------- */
 
 function SectionHeader({
   title,
@@ -149,7 +153,7 @@ function SectionHeader({
   creekNavy: string;
 }) {
   return (
-    <div className="mb-5">
+    <div className="mb-4 sm:mb-5">
       {kicker && (
         <div
           className="inline-block rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-white"
@@ -177,7 +181,7 @@ function SectionHeader({
         </svg>
 
         <h2
-          className="text-2xl sm:text-3xl font-extrabold tracking-tight"
+          className="text-xl font-extrabold tracking-tight sm:text-3xl"
           style={{ color: creekNavy }}
         >
           {title}

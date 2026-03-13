@@ -36,7 +36,7 @@ export function MissionSection({
   creekNavy,
 }: MissionSectionProps) {
   return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <SectionHeader
         title="Our Mission"
         kicker="Cherry Creek"
@@ -48,7 +48,7 @@ export function MissionSection({
         <div className="grid items-start gap-8 md:grid-cols-2">
           {/* TEXT SIDE */}
           <div>
-            <p className="text-lg leading-relaxed text-gray-700">
+            <p className="text-base sm:text-lg leading-relaxed text-gray-700">
               We help students and staff reunite with their belongings quickly
               and safely. With simple tech and community cooperation, we reduce
               stress, waste, and time spent searching—one backpack at a time.
@@ -59,7 +59,7 @@ export function MissionSection({
               initial="hidden"
               whileInView="show"
               viewport={{ once: true, amount: 0.2 }}
-              className="mt-8 grid gap-4 sm:grid-cols-3"
+              className="mt-6 grid grid-cols-3 gap-3"
             >
               {[
                 {
@@ -84,10 +84,10 @@ export function MissionSection({
                   whileHover={{ y: -6, scale: 1.02 }}
                   whileTap={{ scale: 0.985 }}
                   transition={HOVER_SPRING}
-                  className="rounded-2xl bg-white p-4 text-center shadow-sm hover:shadow-lg"
+                  className="rounded-2xl bg-white p-3 sm:p-4 text-center shadow-sm hover:shadow-lg"
                 >
                   <div
-                    className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-lg"
+                    className="mx-auto flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full text-base sm:text-lg"
                     style={{
                       backgroundColor: `${creekRed}1A`,
                       color: creekRed,
@@ -97,13 +97,15 @@ export function MissionSection({
                   </div>
 
                   <div
-                    className="mt-2 font-semibold"
+                    className="mt-2 text-sm sm:text-base font-semibold"
                     style={{ color: creekNavy }}
                   >
                     {f.title}
                   </div>
 
-                  <p className="text-sm text-gray-600">{f.desc}</p>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-snug">
+                    {f.desc}
+                  </p>
                 </motion.li>
               ))}
             </motion.ul>
@@ -115,7 +117,7 @@ export function MissionSection({
               <motion.img
                 src={`${base}/images/LostBackpack.png`}
                 alt="Students reuniting with a backpack"
-                className="h-72 w-full rounded-xl object-cover"
+                className="h-52 sm:h-64 md:h-72 w-full rounded-xl object-cover"
                 whileHover={{ scale: 1.03 }}
                 transition={{ duration: 0.8, ease: easeOutQuint }}
               />
@@ -205,7 +207,7 @@ function PaperGrid({
 
   return (
     <div
-      className="rounded-3xl p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,.05)]"
+      className="rounded-3xl p-4 sm:p-6 lg:p-8 shadow-[0_10px_30px_rgba(0,0,0,.05)]"
       style={{
         backgroundImage: `url("data:image/svg+xml,${dot}")`,
         backgroundColor: "#fafbff",

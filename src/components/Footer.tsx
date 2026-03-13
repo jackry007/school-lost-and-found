@@ -28,7 +28,7 @@ export default function Footer() {
 
   return (
     <footer
-      className="mt-16 border-t border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-neutral-950 dark:text-neutral-200"
+      className="mt-10 sm:mt-16 border-t border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-neutral-950 dark:text-neutral-200"
       aria-label="Site footer"
       id="site-footer"
     >
@@ -43,7 +43,7 @@ export default function Footer() {
 
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         {/* Modern “app card” container */}
-        <div className="rounded-3xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-6">
+        <div className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-6">
           {/* Top area */}
           <div className="grid gap-6 md:grid-cols-[1.35fr_1fr] md:items-start">
             {/* Brand block */}
@@ -52,7 +52,7 @@ export default function Footer() {
                 About this site
               </h2>
 
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <Link
                   href="/"
                   className="shrink-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
@@ -70,7 +70,7 @@ export default function Footer() {
                 </Link>
 
                 <div className="min-w-0">
-                  <p className="text-base font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-lg">
+                  <p className="text-sm sm:text-base lg:text-lg font-extrabold tracking-tight text-gray-900 dark:text-white">
                     Cherry Creek HS — Lost &amp; Found
                   </p>
                   <p className="mt-1 text-sm text-gray-600 dark:text-neutral-300">
@@ -79,7 +79,7 @@ export default function Footer() {
 
                   {/* Info chips */}
                   <div className="mt-4 grid gap-2">
-                    <div className="flex items-start gap-2 rounded-2xl border border-black/10 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200">
+                    <div className="flex items-start gap-2 rounded-2xl border border-black/10 bg-gray-50 px-3 py-2 text-[13px] sm:text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200">
                       <Clock
                         size={16}
                         className="mt-0.5 opacity-80"
@@ -197,11 +197,11 @@ export default function Footer() {
           {/* Bottom actions */}
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <nav aria-label="Footer quick actions" className="text-sm">
-              <ul className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
+              <ul className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center md:justify-start">
                 <li>
                   <Link
                     href="/report"
-                    className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+                    className="inline-flex w-full sm:w-auto items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
                     style={{
                       backgroundColor: CREEK_RED,
                       ["--tw-ring-color" as any]: "rgba(191,30,46,.55)",
@@ -214,7 +214,7 @@ export default function Footer() {
                 <li>
                   <Link
                     href="/search"
-                    className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold border border-black/10 bg-white hover:bg-gray-50 text-gray-900 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
+                    className="inline-flex w-full sm:w-auto items-center justify-center rounded-full px-4 py-2 text-sm font-semibold border border-black/10 bg-white hover:bg-gray-50 text-gray-900 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-neutral-950"
                   >
                     Browse Items
                   </Link>

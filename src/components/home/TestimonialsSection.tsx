@@ -41,7 +41,7 @@ export function TestimonialsSection({
   creekNavy,
 }: TestimonialsSectionProps) {
   return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
       <SectionHeader
         title="What people say"
         creekRed={creekRed}
@@ -53,7 +53,7 @@ export function TestimonialsSection({
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
-        className="mt-4 grid gap-5 md:grid-cols-3"
+        className="mt-4 grid gap-4 sm:gap-5 md:grid-cols-3"
       >
         {testimonials.map((t, i) => (
           <QuoteCard
@@ -93,13 +93,13 @@ function QuoteCard({
       variants={fadeUp}
       whileHover={{ y: -6, rotate: -0.2 }}
       whileTap={{ scale: 0.985 }}
-      className="relative rounded-2xl border bg-white p-5 pr-6 shadow-sm will-change-transform hover:shadow-lg"
+      className="relative rounded-2xl border bg-white p-4 pr-5 shadow-sm will-change-transform hover:shadow-lg sm:p-5 sm:pr-6"
       style={{ borderColor: "#E5E7EB" }}
     >
       {/* quote bubble */}
       <motion.span
         layout
-        className="absolute -top-3 left-5 inline-flex h-8 w-8 items-center justify-center rounded-full text-base text-white"
+        className="absolute -top-3 left-4 inline-flex h-10 w-10 items-center justify-center rounded-full text-lg text-white sm:left-5 sm:h-11 sm:w-11 sm:text-xl"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       >
@@ -108,14 +108,16 @@ function QuoteCard({
 
       {/* tiny accent dot */}
       <span
-        className="absolute -left-2 top-6 h-3 w-3 rounded-full"
+        className="absolute -left-2 top-8 h-3 w-3 rounded-full"
         style={{ backgroundColor: color }}
         aria-hidden="true"
       />
 
-      <p className="mt-1 text-gray-800">“{quote}”</p>
+      <p className="mt-4 text-base leading-relaxed text-gray-800 sm:text-lg">
+        “{quote}”
+      </p>
 
-      <footer className="mt-4 text-sm text-gray-600">
+      <footer className="mt-4 text-sm text-gray-600 sm:text-base">
         <span className="font-semibold" style={{ color: creekNavy }}>
           {name}
         </span>{" "}
@@ -125,7 +127,7 @@ function QuoteCard({
   );
 }
 
-/* ---------- Section Header (local copy) ---------- */
+/* ---------- Section Header ---------- */
 
 function SectionHeader({
   title,
@@ -139,7 +141,7 @@ function SectionHeader({
   creekNavy: string;
 }) {
   return (
-    <div className="mb-5">
+    <div className="mb-4 sm:mb-5">
       {kicker && (
         <div
           className="inline-block rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-white"
@@ -167,7 +169,7 @@ function SectionHeader({
         </svg>
 
         <h2
-          className="text-2xl sm:text-3xl font-extrabold tracking-tight"
+          className="text-xl font-extrabold tracking-tight sm:text-3xl"
           style={{ color: creekNavy }}
         >
           {title}

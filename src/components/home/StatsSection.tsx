@@ -48,7 +48,7 @@ export function StatsSection({
   const barRecent = totalItems ? safePct((recent / totalItems) * 100) : 0;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <SectionHeader
         title="Program stats"
         kicker="At a glance"
@@ -61,7 +61,7 @@ export function StatsSection({
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.2 }}
-        className="grid grid-cols-2 gap-4 md:grid-cols-4"
+        className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4"
       >
         <CreekStat
           icon="🧾"
@@ -120,20 +120,22 @@ function CreekStat({
       variants={fadeUp}
       whileHover={{ y: -6, scale: 1.01 }}
       whileTap={{ scale: 0.985 }}
-      className="rounded-2xl border bg-white p-4 shadow-sm transition-colors duration-200 will-change-transform hover:shadow-lg"
+      className="rounded-2xl border bg-white p-3 sm:p-4 shadow-sm transition-colors duration-200 will-change-transform hover:shadow-lg"
       style={{ borderColor: "#E5E7EB" }}
     >
       <div className="flex items-center justify-between">
-        <div className="text-xl">{icon}</div>
+        <div className="text-lg sm:text-xl">{icon}</div>
         <div
-          className="text-2xl font-extrabold tabular-nums"
+          className="text-xl sm:text-2xl font-extrabold tabular-nums"
           style={{ color: creekNavy }}
         >
           {value}
         </div>
       </div>
 
-      <div className="mt-2 text-[12px] text-gray-600">{label}</div>
+      <div className="mt-2 text-[11px] sm:text-[12px] leading-snug text-gray-600">
+        {label}
+      </div>
 
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
         <motion.div
@@ -163,7 +165,7 @@ function SectionHeader({
   creekNavy: string;
 }) {
   return (
-    <div className="mb-5">
+    <div className="mb-4 sm:mb-5">
       {kicker && (
         <div
           className="inline-block rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-white"
@@ -191,7 +193,7 @@ function SectionHeader({
         </svg>
 
         <h2
-          className="text-2xl sm:text-3xl font-extrabold tracking-tight"
+          className="text-xl sm:text-3xl font-extrabold tracking-tight"
           style={{ color: creekNavy }}
         >
           {title}

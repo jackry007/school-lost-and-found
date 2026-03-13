@@ -9,7 +9,7 @@ import logo from "../../public/images/cherry-creek-logo.png";
 export default function SchoolHeaderLogo() {
   return (
     <div className="border-b border-gray-200 bg-white">
-      <div className="flex w-full items-center justify-between pl-0 pr-8 lg:pr-12 py-6">
+      <div className="flex w-full items-center justify-between pl-0 pr-8 lg:pr-12 py-3 sm:py-5 lg:py-6">
         {/* Left: Logo + Text */}
         <Link
           href="/"
@@ -19,15 +19,15 @@ export default function SchoolHeaderLogo() {
           <Image
             src={logo}
             alt="Cherry Creek High School logo"
-            className="h-28 w-auto"
+            className="h-16 sm:h-20 lg:h-28 w-auto"
             priority
           />
 
           <div className="leading-tight select-none">
-            <div className="text-4xl font-extrabold tracking-tight text-[#BF1E2E]">
+            <div className="text-xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-[#BF1E2E]">
               CHERRY CREEK
             </div>
-            <div className="text-3xl font-semibold text-[#BF1E2E]">
+            <div className="text-lg sm:text-2xl lg:text-3xl font-semibold text-[#BF1E2E]">
               HIGH SCHOOL
             </div>
           </div>
