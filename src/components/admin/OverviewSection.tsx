@@ -152,28 +152,28 @@ export default function OverviewSection({
   }
 
   return (
-    <div className="mt-4 space-y-10">
+    <div className="mt-4 space-y-8 sm:space-y-10">
       <section className="space-y-4">
-        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium tracking-wide text-gray-500">
+        <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-xs font-medium tracking-wide text-gray-500 sm:text-sm">
                 Creek Lost &amp; Found
               </div>
-              <div className="text-[2rem] font-semibold tracking-tight text-gray-900">
+              <div className="mt-1 text-[1.9rem] font-semibold leading-tight tracking-tight text-gray-900 sm:text-[2rem]">
                 Moderation Dashboard
               </div>
             </div>
 
             <div
-              className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              className="inline-flex w-fit rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm"
               style={{ background: CREEK_NAVY }}
             >
               Admin Overview
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
             <StatCard label="Total items" value={totalItems} tint="#FFFFFF" />
             <StatCard label="Total claims" value={totalClaims} tint="#FFFFFF" />
             <StatCard label="Listed" value={listedCount} tint="#EEF2FF" />
@@ -183,6 +183,7 @@ export default function OverviewSection({
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <Card className="p-4 md:col-span-1">
               <div className="text-sm font-medium text-gray-500">Secondary</div>
+
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-gray-200 bg-white p-4">
                   <div className="text-sm text-gray-500">On Hold</div>
@@ -190,6 +191,7 @@ export default function OverviewSection({
                     {onHoldCount}
                   </div>
                 </div>
+
                 <div className="rounded-2xl border border-gray-200 bg-white p-4">
                   <div className="text-sm text-gray-500">Rejected</div>
                   <div className="mt-2 text-2xl font-semibold text-gray-900">
@@ -200,7 +202,7 @@ export default function OverviewSection({
             </Card>
 
             <Card className="p-4 md:col-span-2">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="text-sm font-medium text-gray-500">
                   Top categories (30d)
                 </div>
@@ -214,12 +216,16 @@ export default function OverviewSection({
                   {topCatsPreview.map(([k, v]) => (
                     <li
                       key={k}
-                      className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3"
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3"
                     >
-                      <span className="truncate font-medium text-gray-900">
+                      <span
+                        className="truncate font-medium text-gray-900"
+                        title={k}
+                      >
                         {k}
                       </span>
-                      <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
                         {v}
                       </span>
                     </li>
@@ -234,10 +240,10 @@ export default function OverviewSection({
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
             <div
-              className="h-7 w-1.5 rounded-full"
+              className="h-7 w-1.5 shrink-0 rounded-full"
               style={{ background: CREEK_NAVY }}
               aria-hidden
             />
@@ -261,15 +267,18 @@ export default function OverviewSection({
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="overflow-hidden p-0">
-            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-4">
               <div className="text-base font-semibold text-gray-900">
                 Pending Items{" "}
                 <span className="font-medium text-gray-500">
                   ({pendingItems.length})
                 </span>
               </div>
+
               {pendingItems.length > 5 && (
-                <span className="pr-2 text-sm text-gray-500">showing 5</span>
+                <span className="pr-1 text-xs text-gray-500 sm:text-sm">
+                  showing 5
+                </span>
               )}
             </div>
 
@@ -288,69 +297,71 @@ export default function OverviewSection({
                       key={it.id}
                       className="px-4 py-3 transition hover:bg-gray-50"
                     >
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            hasPhoto ? openItemPhotos(it) : undefined
-                          }
-                          disabled={!hasPhoto}
-                          className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
-                          title={
-                            hasPhoto
-                              ? "Click to view photo"
-                              : "No photo available"
-                          }
-                          aria-label={`View photo for item ${it.id}`}
-                        >
-                          <Thumb src={previewSrc} alt={it.title} />
-                        </button>
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              hasPhoto ? openItemPhotos(it) : undefined
+                            }
+                            disabled={!hasPhoto}
+                            className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
+                            title={
+                              hasPhoto
+                                ? "Click to view photo"
+                                : "No photo available"
+                            }
+                            aria-label={`View photo for item ${it.id}`}
+                          >
+                            <Thumb src={previewSrc} alt={it.title} />
+                          </button>
 
-                        <RowInfo
-                          title={
-                            <span
-                              className="block truncate text-base font-semibold text-gray-900"
-                              title={it.title}
-                            >
-                              #{it.id} · {it.title}
-                            </span>
-                          }
-                          meta={
-                            <span className="block truncate text-xs text-gray-600">
-                              {it.category ?? "—"} ·{" "}
-                              {(it as any).location ?? "—"}
-                            </span>
-                          }
-                        />
-                      </div>
-
-                      <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 md:w-auto md:min-w-[180px] md:items-end">
-                        <div
-                          className="flex flex-wrap gap-2 md:justify-end"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Btn tone="edit" onClick={() => onEditItem(it)}>
-                            Edit
-                          </Btn>
+                          <RowInfo
+                            title={
+                              <span
+                                className="block truncate text-sm font-semibold text-gray-900 sm:text-base"
+                                title={it.title}
+                              >
+                                #{it.id} · {it.title}
+                              </span>
+                            }
+                            meta={
+                              <span className="block truncate text-xs text-gray-600">
+                                {it.category ?? "—"} ·{" "}
+                                {(it as any).location ?? "—"}
+                              </span>
+                            }
+                          />
                         </div>
 
-                        <div
-                          className="flex flex-wrap gap-2 md:justify-end"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Btn
-                            tone="approve"
-                            onClick={() => onAskApproveItem(it)}
+                        <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:min-w-[180px] sm:items-end">
+                          <div
+                            className="flex flex-wrap gap-2 sm:justify-end"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            Approve
-                          </Btn>
+                            <Btn tone="edit" onClick={() => onEditItem(it)}>
+                              Edit
+                            </Btn>
+                          </div>
 
-                          <Btn
-                            tone="reject"
-                            onClick={() => onAskRejectItem(it)}
+                          <div
+                            className="flex flex-wrap gap-2 sm:justify-end"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            Reject
-                          </Btn>
+                            <Btn
+                              tone="approve"
+                              onClick={() => onAskApproveItem(it)}
+                            >
+                              Approve
+                            </Btn>
+
+                            <Btn
+                              tone="reject"
+                              onClick={() => onAskRejectItem(it)}
+                            >
+                              Reject
+                            </Btn>
+                          </div>
                         </div>
                       </div>
                     </Row>
@@ -361,15 +372,18 @@ export default function OverviewSection({
           </Card>
 
           <Card className="overflow-hidden p-0">
-            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4">
-              <div className="text-xl font-semibold text-gray-900">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-4">
+              <div className="text-lg font-semibold text-gray-900 sm:text-xl">
                 Pending Claims{" "}
                 <span className="font-medium text-gray-500">
                   ({pendingClaims.length})
                 </span>
               </div>
+
               {pendingClaims.length > 3 && (
-                <span className="pr-2 text-sm text-gray-500">showing 3</span>
+                <span className="pr-1 text-xs text-gray-500 sm:text-sm">
+                  showing 3
+                </span>
               )}
             </div>
 
@@ -402,127 +416,129 @@ export default function OverviewSection({
                   ) as string[];
 
                   return (
-                    <Row key={c.id} className="px-3 py-2">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            claimViewerUrls.length
-                              ? onOpenPhotos({
-                                  title: item?.title
-                                    ? `#${item.id} · ${item.title}`
-                                    : `Item #${c.item_id}`,
-                                  urls: claimViewerUrls,
-                                  category: item?.category ?? undefined,
-                                  location:
-                                    (item as any)?.location ?? undefined,
-                                  description:
-                                    getItemDescription(item) ??
-                                    `Claim submitted by ${(c as any).claimant_name || "student"}`,
-                                })
-                              : undefined
-                          }
-                          disabled={!claimViewerUrls.length}
-                          className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
-                          title={
-                            t?.proofs?.length
-                              ? "Click to view proof photos"
-                              : "Click to view item photo"
-                          }
-                          aria-label={
-                            t?.proofs?.length
-                              ? `View proof photos for claim ${c.id}`
-                              : `View item photo for claim ${c.id}`
-                          }
-                        >
-                          <Thumb
-                            src={t?.itemThumb || itemPreviewSrc}
-                            alt={`Item #${c.item_id}`}
-                          />
-                        </button>
+                    <Row key={c.id} className="px-4 py-3">
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              claimViewerUrls.length
+                                ? onOpenPhotos({
+                                    title: item?.title
+                                      ? `#${item.id} · ${item.title}`
+                                      : `Item #${c.item_id}`,
+                                    urls: claimViewerUrls,
+                                    category: item?.category ?? undefined,
+                                    location:
+                                      (item as any)?.location ?? undefined,
+                                    description:
+                                      getItemDescription(item) ??
+                                      `Claim submitted by ${(c as any).claimant_name || "student"}`,
+                                  })
+                                : undefined
+                            }
+                            disabled={!claimViewerUrls.length}
+                            className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-default"
+                            title={
+                              t?.proofs?.length
+                                ? "Click to view proof photos"
+                                : "Click to view item photo"
+                            }
+                            aria-label={
+                              t?.proofs?.length
+                                ? `View proof photos for claim ${c.id}`
+                                : `View item photo for claim ${c.id}`
+                            }
+                          >
+                            <Thumb
+                              src={t?.itemThumb || itemPreviewSrc}
+                              alt={`Item #${c.item_id}`}
+                            />
+                          </button>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-base font-semibold text-gray-800">
-                            {item?.title
-                              ? `Claim #${c.id} → ${item.title}`
-                              : `Claim #${c.id} → Item #${c.item_id}`}
-                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-gray-800 sm:text-base">
+                              {item?.title
+                                ? `Claim #${c.id} → ${item.title}`
+                                : `Claim #${c.id} → Item #${c.item_id}`}
+                            </div>
 
-                          <div className="mt-0.5 text-xs text-gray-600">
-                            {(c as any).claimant_name}
-                            <span className="text-gray-400">
-                              {" "}
-                              ({(c as any).claimant_email})
-                            </span>
-                          </div>
-
-                          {schedChip && (
-                            <div className="mt-2">
-                              <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
-                                Scheduled: {schedChip}
+                            <div className="mt-0.5 text-xs text-gray-600">
+                              {(c as any).claimant_name}
+                              <span className="text-gray-400">
+                                {" "}
+                                ({(c as any).claimant_email})
                               </span>
                             </div>
-                          )}
-                        </div>
-                      </div>
 
-                      <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 md:w-auto md:min-w-[240px] md:items-end">
-                        <div
-                          className="flex flex-wrap gap-2 md:justify-end"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {t?.proofs?.length ? (
-                            <button
-                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-md active:scale-[0.98]"
-                              onClick={() =>
-                                onOpenPhotos({
-                                  title: item?.title
-                                    ? `#${item.id} · ${item.title}`
-                                    : `Proof photos — Claim #${c.id}`,
-                                  urls: t.proofs || [],
-                                  category: item?.category ?? undefined,
-                                  location:
-                                    (item as any)?.location ?? undefined,
-                                  description:
-                                    getItemDescription(item) ??
-                                    `Submitted by ${(c as any).claimant_name || "student"} · ${(c as any).claimant_email || ""}`,
-                                })
-                              }
-                              title="View proof photos"
+                            {schedChip && (
+                              <div className="mt-2">
+                                <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
+                                  Scheduled: {schedChip}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="relative z-10 flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:min-w-[240px] sm:items-end">
+                          <div
+                            className="flex flex-wrap gap-2 sm:justify-end"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {t?.proofs?.length ? (
+                              <button
+                                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-md active:scale-[0.98]"
+                                onClick={() =>
+                                  onOpenPhotos({
+                                    title: item?.title
+                                      ? `#${item.id} · ${item.title}`
+                                      : `Proof photos — Claim #${c.id}`,
+                                    urls: t.proofs || [],
+                                    category: item?.category ?? undefined,
+                                    location:
+                                      (item as any)?.location ?? undefined,
+                                    description:
+                                      getItemDescription(item) ??
+                                      `Submitted by ${(c as any).claimant_name || "student"} · ${(c as any).claimant_email || ""}`,
+                                  })
+                                }
+                                title="View proof photos"
+                              >
+                                View Proofs ({t.proofs.length})
+                              </button>
+                            ) : null}
+
+                            <Btn tone="message" onClick={() => onOpenChat(c)}>
+                              Message
+                            </Btn>
+
+                            <Btn
+                              tone="schedule"
+                              onClick={() => onOpenSchedule(c)}
                             >
-                              View Proofs ({t.proofs.length})
-                            </button>
-                          ) : null}
+                              {schedChip ? "Reschedule" : "Schedule"}
+                            </Btn>
+                          </div>
 
-                          <Btn tone="message" onClick={() => onOpenChat(c)}>
-                            Message
-                          </Btn>
-
-                          <Btn
-                            tone="schedule"
-                            onClick={() => onOpenSchedule(c)}
+                          <div
+                            className="flex flex-wrap gap-2 sm:justify-end"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {schedChip ? "Reschedule" : "Schedule"}
-                          </Btn>
-                        </div>
+                            <Btn
+                              tone="approve"
+                              onClick={() => onAskApproveClaim(c)}
+                            >
+                              Approve
+                            </Btn>
 
-                        <div
-                          className="flex flex-wrap gap-2 md:justify-end"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Btn
-                            tone="approve"
-                            onClick={() => onAskApproveClaim(c)}
-                          >
-                            Approve
-                          </Btn>
-
-                          <Btn
-                            tone="reject"
-                            onClick={() => onAskRejectClaim(c)}
-                          >
-                            Reject
-                          </Btn>
+                            <Btn
+                              tone="reject"
+                              onClick={() => onAskRejectClaim(c)}
+                            >
+                              Reject
+                            </Btn>
+                          </div>
                         </div>
                       </div>
                     </Row>
