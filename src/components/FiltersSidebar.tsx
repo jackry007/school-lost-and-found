@@ -118,7 +118,7 @@ export function FiltersSidebar({ initial }: Props) {
   return (
     <aside className="self-start w-full md:sticky md:top-16 md:w-64">
       <div
-        className="rounded-3xl bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,.05)] dark:bg-gray-900"
+        className="rounded-3xl bg-white p-4 sm:p-5 shadow-[0_10px_30px_rgba(0,0,0,.05)] dark:bg-gray-900"
         style={{
           backgroundImage: `url("data:image/svg+xml,${dot}")`,
           backgroundColor: "#fafbff",
@@ -165,7 +165,7 @@ export function FiltersSidebar({ initial }: Props) {
           ref={formRef}
           action={BASE ? `${BASE}/search` : "/search"}
           method="get"
-          className="space-y-5"
+          className="space-y-4 sm:space-y-5"
           onChange={onChange}
         >
           {initial.q && (
@@ -201,7 +201,7 @@ export function FiltersSidebar({ initial }: Props) {
                     key={`chip-${normalize(c)}`}
                     type="button"
                     onClick={() => toggleCat(c)}
-                    className={`rounded-full px-3 py-1.5 text-sm shadow-sm ring-1 transition ${
+                    className={`rounded-full px-2.5 py-1 text-[13px] shadow-sm ring-1 transition ${
                       active
                         ? "text-white"
                         : "bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-200"
@@ -250,7 +250,7 @@ export function FiltersSidebar({ initial }: Props) {
               Date range
             </p>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <div className="min-w-0 flex-1">
                 <input
                   type="date"
@@ -291,10 +291,10 @@ export function FiltersSidebar({ initial }: Props) {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <button
               type="submit"
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+              className="w-full sm:w-auto rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
               style={{ backgroundColor: CREEK_RED }}
             >
               Apply

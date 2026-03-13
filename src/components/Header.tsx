@@ -591,16 +591,12 @@ export function Header() {
                   <>
                     <div className="my-1 h-px bg-white/15" />
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMobileOpen(false);
-                        guardedGo("/messages");
-                      }}
-                      className="w-full text-left rounded-xl px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
+                    <div
+                      className="w-full [&>button]:w-full [&>button]:text-left [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-3 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-white [&>button]:transition [&>button]:hover:bg-white/15"
+                      onClick={() => setMobileOpen(false)}
                     >
-                      Messages
-                    </button>
+                      <MessagesPortal />
+                    </div>
 
                     <button
                       type="button"
