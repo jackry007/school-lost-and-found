@@ -66,6 +66,7 @@ type ConfirmState =
   | { type: "reject-item"; item: Item }
   | { type: "approve-claim"; claim: Claim }
   | { type: "reject-claim"; claim: Claim }
+  | { type: "mark-picked-up"; claim: Claim }
   | null;
 
 /* =========================================================
@@ -315,6 +316,20 @@ export default function AdminPage() {
     );
   }
 
+  async function onCopyPickupCode(code?: string | null) {
+    if (!code) {
+      addToast("No pickup code found.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(code);
+      addToast(`Pickup code copied: ${code}`);
+    } catch {
+      addToast(`Pickup code: ${code}`);
+    }
+  }
+
   /* ---------------- Actions: auth ---------------- */
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -381,6 +396,10 @@ export default function AdminPage() {
     setApproveOpen(true);
   };
 
+  function askMarkPickedUp(c: Claim) {
+    setConfirmState({ type: "mark-picked-up", claim: c });
+  }
+
   const confirmApprove = async () => {
     if (!approveTarget) return;
     const id = approveTarget.id;
@@ -392,7 +411,6 @@ export default function AdminPage() {
     setApproveOpen(false);
     setApproveBusy(false);
 
-    // undo toast
     addToast(`Approved: “${approveTarget.title}”`, {
       actionLabel: "Undo (5s)",
       ttl: 5000,
@@ -407,7 +425,6 @@ export default function AdminPage() {
       },
     });
 
-    // persist
     const { error } = await supabase
       .from("items")
       .update({ status: "listed" })
@@ -567,6 +584,26 @@ export default function AdminPage() {
     }
   }
 
+  async function onMarkPickedUpClaim(c: Claim) {
+    const uid = await getUid();
+    if (!uid) {
+      addToast("Not signed in.");
+      return;
+    }
+
+    setMarkBusy(true);
+    try {
+      await markClaimPickedUp(c.id, uid);
+      addToast(`Claim #${c.id} marked picked up ✅`);
+      await logEvent("mark_picked_up", "claim", c.id, { item_id: c.item_id });
+      await load();
+    } catch (err: any) {
+      addToast(err?.message ?? "Failed to mark picked up");
+    } finally {
+      setMarkBusy(false);
+    }
+  }
+
   async function onMarkPickedUp() {
     const code = pickupCode.trim().toUpperCase();
     if (!code) return;
@@ -621,6 +658,8 @@ export default function AdminPage() {
         await onApproveClaim(confirmState.claim);
       } else if (confirmState.type === "reject-claim") {
         await onRejectClaim(confirmState.claim);
+      } else if (confirmState.type === "mark-picked-up") {
+        await onMarkPickedUpClaim(confirmState.claim);
       }
 
       setConfirmState(null);
@@ -640,6 +679,7 @@ export default function AdminPage() {
     (i) => (i.status as ItemStatusWidened) === "pending",
   );
   const pendingClaims = claims.filter((c) => c.status === "pending");
+  const approvedClaims = claims.filter((c) => c.status === "approved");
 
   const claimThumbs = useMemo(
     () => computeClaimThumbs(claims, items, thumbMap),
@@ -707,6 +747,7 @@ export default function AdminPage() {
             topCats={topCats}
             pendingItems={pendingItems}
             pendingClaims={pendingClaims}
+            approvedClaims={approvedClaims}
             thumbMap={thumbMap}
             claimThumbs={claimThumbs}
             logLoadedOnce={logLoadedOnce}
@@ -721,6 +762,9 @@ export default function AdminPage() {
             onOpenChat={openChat}
             onAskApproveClaim={askApproveClaim}
             onAskRejectClaim={askRejectClaim}
+            onMarkPickedUpClaim={askMarkPickedUp}
+            onCopyPickupCode={onCopyPickupCode}
+            markBusy={markBusy}
           />
         )}
 
@@ -791,10 +835,16 @@ export default function AdminPage() {
               ? "Approve claim?"
               : confirmState?.type === "reject-claim"
                 ? "Reject claim?"
-                : "Confirm action"
+                : confirmState?.type === "mark-picked-up"
+                  ? "Confirm pickup?"
+                  : "Confirm action"
         }
         confirmLabel={
-          confirmState?.type === "approve-claim" ? "Approve" : "Reject"
+          confirmState?.type === "approve-claim"
+            ? "Approve"
+            : confirmState?.type === "mark-picked-up"
+              ? "Mark Picked Up"
+              : "Reject"
         }
         cancelLabel="Cancel"
         onCancel={() => {
@@ -823,6 +873,14 @@ export default function AdminPage() {
           <>
             Are you sure you want to reject claim{" "}
             <span className="font-semibold">#{confirmState.claim.id}</span>?
+          </>
+        )}
+
+        {confirmState?.type === "mark-picked-up" && (
+          <>
+            Confirm that claim{" "}
+            <span className="font-semibold">#{confirmState.claim.id}</span> has
+            picked up the item?
           </>
         )}
       </ConfirmModal>
