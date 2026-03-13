@@ -4,7 +4,7 @@
 import { motion } from "framer-motion";
 
 type HeroSectionProps = {
-  base: string; // BASE from /lib/basePath
+  base: string;
   creekRed: string;
   creekNavy: string;
 
@@ -27,7 +27,7 @@ export function HeroSection({
   onBrowse,
 }: HeroSectionProps) {
   return (
-    <section className="relative min-h-[68vh] md:h-[520px] w-full overflow-hidden">
+    <section className="relative min-h-[58vh] sm:min-h-[64vh] md:h-[520px] w-full overflow-hidden">
       <img
         src={`${base}/images/backpack-bench.jpg`}
         alt="A backpack left on a school bench"
@@ -38,66 +38,62 @@ export function HeroSection({
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(90deg, rgba(11,44,92,0.85) 0%, rgba(11,44,92,0.6) 40%, rgba(11,44,92,0.0) 100%)",
+            "linear-gradient(90deg, rgba(11,44,92,0.88) 0%, rgba(11,44,92,0.68) 42%, rgba(11,44,92,0.08) 100%)",
         }}
       />
 
-      <div className="relative z-10 mx-auto flex h-full max-w-7xl items-center px-6 sm:px-8 lg:px-10">
+      <div className="relative z-10 mx-auto flex h-full max-w-7xl items-start sm:items-center px-4 sm:px-8 lg:px-10 pt-10 pb-24 sm:pb-20">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, ease: easeOutQuint }}
           className="max-w-xl text-white"
         >
-          <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
+          <h1 className="text-3xl font-extrabold leading-tight sm:text-4xl lg:text-5xl">
             Cherry Creek Lost &amp; Found
           </h1>
 
-          <p className="mt-3 text-white/95">
+          <p className="mt-3 max-w-md text-base text-white/95 sm:text-lg">
             Fast, fair, and secure—get belongings back where they belong.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            {/* Primary */}
+          <div className="mt-6 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
             <button
               type="button"
               disabled={authLoading}
               onClick={onReport}
-              className="inline-flex h-[42px] items-center justify-center rounded-lg px-5 text-sm font-semibold text-white shadow-md transition disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex h-[46px] w-full sm:w-auto items-center justify-center rounded-xl px-5 text-sm font-semibold text-white shadow-md transition disabled:cursor-not-allowed disabled:opacity-70"
               style={{ backgroundColor: creekRed }}
             >
               Report Found Item
             </button>
 
-            {/* Secondary */}
             <button
               type="button"
               disabled={authLoading}
               onClick={onBrowse}
-              className="inline-flex h-[42px] items-center justify-center rounded-lg border border-white/80 px-5 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex h-[46px] w-full sm:w-auto items-center justify-center rounded-xl border border-white/80 px-5 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
               style={{ ["--tw-ring-color" as any]: creekNavy }}
             >
               {isAuthed ? "Browse Items" : "Sign in to Browse"}
             </button>
           </div>
 
-          {/* tiny helper line */}
           {!isAuthed && !authLoading && (
-            <p className="mt-3 text-xs text-white/85">
+            <p className="mt-3 max-w-md text-xs sm:text-sm text-white/85">
               Tip: Signing in lets you see recently reported items.
             </p>
           )}
         </motion.div>
       </div>
 
-      {/* tagline pill */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 1.0, ease: easeOutQuint }}
-        className="absolute bottom-6 left-1/2 -translate-x-1/2"
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 w-full sm:w-auto"
       >
-        <div className="mx-auto inline-flex items-center gap-3 rounded-full bg-white/95 px-4 py-2 text-sm font-medium text-gray-800 shadow-lg backdrop-blur">
+        <div className="mx-auto inline-flex max-w-full items-center gap-2 sm:gap-3 rounded-full bg-white/95 px-4 py-2 text-sm font-medium text-gray-800 shadow-lg backdrop-blur">
           <span>🎒 Leave it.</span>
           <span>📝 Log it.</span>
           <span>🔎 Find it.</span>
