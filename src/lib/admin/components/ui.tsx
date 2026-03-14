@@ -171,6 +171,8 @@ export function RowActions({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ---------- Button Component ---------- */
+
 export function Btn({
   children,
   onClick,
@@ -189,12 +191,13 @@ export function Btn({
     | "schedule"
     | "edit"
     | "success"
-    | "ghost";
+    | "ghost"
+    | "primary";
 }) {
   const base =
     "inline-flex min-w-[96px] items-center justify-center rounded-full px-3 py-1 text-sm font-medium shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm";
 
-  if (tone === "approve") {
+  if (tone === "approve" || tone === "primary") {
     return (
       <button
         type={type}
@@ -313,6 +316,8 @@ export function Btn({
   );
 }
 
+/* ---------- Status + Thumbnail ---------- */
+
 export type ItemStatusWidened =
   | "pending"
   | "listed"
@@ -349,10 +354,10 @@ export function StatusBadge({ status }: { status: ItemStatusWidened }) {
     </span>
   );
 }
+
 export function Thumb({ src, alt }: { src?: string; alt?: string }) {
   return (
     <div className="mr-3 h-12 w-16 cursor-zoom-in overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:shadow-sm">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src || FALLBACK_THUMB}
         alt={alt || ""}
