@@ -5,7 +5,6 @@ import { Modal } from "@/lib/admin/components/modals/Modal";
 import { Btn, Labeled } from "@/lib/admin/components";
 
 export type EditItemForm = Partial<Item> & {
-  // your schema uses a "location" column but Item type might not include it
   location?: string;
 };
 
@@ -76,7 +75,7 @@ export default function EditItemModal({
         <Btn tone="ghost" onClick={onClose} disabled={saving}>
           Cancel
         </Btn>
-        <Btn tone="primary" onClick={onSave} disabled={saving}>
+        <Btn tone="success" onClick={onSave} disabled={saving}>
           {saving ? "Saving…" : "Save changes"}
         </Btn>
       </div>
