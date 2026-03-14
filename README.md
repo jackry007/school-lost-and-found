@@ -1,159 +1,113 @@
 # 🎒 CCHS Lost & Found Portal
 
-A secure, moderated Lost & Found platform built for school environments.  
-Designed to increase item return rates, reduce staff workload, and protect student privacy.
+A secure digital platform designed to help Cherry Creek High School manage lost and found items more efficiently.
+
+The system increases item return rates, improves visibility for students, and reduces administrative workload.
 
 ---
 
-## 📌 What It Is
+# 📌 Project Overview
 
 CCHS Lost & Found is a full-stack web application that modernizes how schools manage misplaced items.
 
-It enables:
+Instead of relying on physical bins, paper logs, or spreadsheets, the platform provides a centralized system where students and staff can:
 
-- Structured item reporting
-- Advanced search & filtering
-- Secure claim verification
-- Admin moderation workflows
-- Privacy-first communication
-
----
-
-## ❗ Problem / Why
-
-Schools process hundreds of misplaced items every semester.
-
-Traditional systems rely on:
-
-- Physical bins
-- Paper logs
-- Unsearchable spreadsheets
-- Manual coordination
-
-This leads to:
-
-- Low return rates
-- Poor visibility
-- Privacy risks
-- Staff inefficiency
-
-This platform replaces that process with a secure, searchable, and moderated system.
-
----
-
-## ✨ Features
-
-### 👤 Public / Guests
-- Search and filter items
-- View detailed item pages
+- Report lost or found items
+- Search and filter item listings
 - Submit claim requests
-- Report found items
-- Report lost items
+- Track item status
+- Allow administrators to moderate and verify claims
 
-### 🎓 Authenticated Students & Staff
-- Track personal submissions
-- Receive status updates
-- Faster claim handling
-
-### 🛠 Admin Dashboard
-- Moderation queue (approve / deny / edit)
-- Status workflow:
-  `Pending → Listed → Claimed → Returned → Archived`
-- Redact sensitive information
-- Merge duplicate items
-- Analytics dashboard
-- CSV export
-- Role management
-- Audit logging
+This creates a safer, faster, and more organized process for returning lost items.
 
 ---
 
-## 🧱 Tech Stack
+# ❗ Problem
 
-**Frontend**
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS
-- Accessible HTML5 components
+Schools process hundreds of misplaced items each semester. Traditional lost and found systems are often inefficient and difficult to manage.
 
-**Backend**
-- Next.js API Routes
-- PostgreSQL
+Common challenges include:
+
+- Physical bins that are hard to search  
+- Paper logs that are difficult to track  
+- Limited visibility for students looking for items  
+- Increased workload for staff  
+- Privacy concerns when sharing information  
+
+Because of these issues, many lost items are never returned to their owners.
+
+---
+
+# 💡 Solution
+
+The CCHS Lost & Found Portal provides a digital system that allows students and staff to easily report, search, and claim lost items.
+
+Administrators can moderate listings and verify claims, ensuring the correct item is returned to the rightful owner.
+
+This improves organization, transparency, and efficiency across the entire lost and found process.
+
+---
+
+# ✨ Key Features
+
+## Public Users
+
+- Search and filter lost & found items  
+- View detailed item pages  
+- Submit claim requests  
+- Report lost items  
+- Report found items  
+
+## Authenticated Students & Staff
+
+- Track their submissions  
+- Receive claim status updates  
+- Faster claim verification  
+
+## Administrator Dashboard
+
+- Moderation queue for approving or rejecting items  
+- Claim verification system  
+- Item status workflow  
+- Audit logs for transparency  
+- Data analytics and reporting  
+
+---
+
+# 🔄 Moderation Workflow
+
+Items move through a structured verification process:
+
+`Pending → Listed → Claimed → Returned → Archived`
+
+This ensures items are reviewed before being publicly listed and properly tracked until they are returned.
+
+---
+
+# 🧱 Technology Stack
+
+## Frontend
+- Next.js  
+- TypeScript  
+- Tailwind CSS  
+
+## Backend
+- Next.js API Routes  
+- PostgreSQL Database  
+
+## Infrastructure
+- Supabase Authentication  
+- Secure image storage  
 - Role-Based Access Control (RBAC)
 
-**Storage**
-- Object storage for images
-- Thumbnail generation
-- EXIF stripping
-
-**Authentication**
-- Email OTP (upgradeable to School SSO)
-
 ---
 
-## 🏗 Architecture Overview
+# 🎯 Impact
 
-The system follows a modern full-stack architecture using the Next.js App Router with server-side API routes.
+The CCHS Lost & Found Portal helps schools:
 
-### High-Level Flow
-
-Client (Browser - Next.js Frontend)  
-↓  
-API Layer (Next.js Server Routes)  
-↓  
-Database (PostgreSQL via Supabase)  
-↓  
-Object Storage (Item Images)
-
----
-
-### Core Components
-
-**Frontend**
-- App Router pages and layouts
-- Server + Client Components
-- Tailwind CSS UI
-- Accessible form handling
-- Role-based UI rendering
-
-**Backend**
-- REST-style API routes (`/api/...`)
-- Server-side validation
-- Authentication & authorization middleware
-- Moderation workflow engine
-- Claims processing logic
-
-**Database**
-- Users table (role-based access)
-- Items (found/lost)
-- Claims
-- Images
-- Audit logs
-- Notifications
-
-**Storage**
-- Secure object storage bucket
-- Randomized filenames
-- Thumbnail generation
-- EXIF metadata stripping
-
----
-
-### Role-Based Access Control (RBAC)
-
-- Guest → Search, report, claim (rate-limited)
-- Authenticated User → Track submissions
-- Admin → Moderate, edit, approve, export, manage users
-
-All admin endpoints are protected via server-side role verification.
-
----
-
-### Moderation Workflow
-
-1. Item submitted → `pending`
-2. Admin review → `approved` or `rejected`
-3. Approved item → `listed`
-4. Claim submitted → `under_review`
-5. Admin verifies → `claimed`
-6. Pickup confirmed → `returned`
+- Increase item return rates  
+- Reduce administrative workload  
+- Improve student access to lost items  
+- Protect student privacy  
+- Modernize outdated lost-and-found systemsÏ
